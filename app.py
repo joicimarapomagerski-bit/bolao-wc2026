@@ -616,7 +616,7 @@ if any("falhou" in m.lower() for m in mensagens_sync):
 else:
     st.caption(" | ".join(mensagens_sync))
 
-usuario = st.text_input("👤 Usuário:", placeholder="Digite seu nome para registrar os palpites...").strip()
+usuario = st.text_input("👤 Usuário:", placeholder="Digite seu nome").strip()
 autorizado = usuario_autorizado(usuario) if usuario else False
 
 if not usuario:
