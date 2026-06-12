@@ -24,9 +24,9 @@ API_LOGIN_EMAIL = "joicimara.pomagerskii@gmail.com"
 # AJUSTE AQUI A LISTA BRANCA
 # =========================
 WHITELIST_NOMES = [
-    "Joicimara",
-    "Vinicius",
-    "Otacilio",
+    "joici",
+    "gui",
+    "dudu",
     # adicione mais nomes aqui
 ]
 
@@ -55,61 +55,60 @@ TEAM_ALIASES = {
 }
 
 TEAM_TO_COUNTRY = {
-    "argentina": "AR",
-    "australia": "AU",
-    "austria": "AT",
-    "belgium": "BE",
-    "brazil": "BR",
-    "bosniaherzegovina": "BA",
-    "canada": "CA",
-    "cameroon": "CM",
-    "chile": "CL",
-    "colombia": "CO",
-    "croatia": "HR",
-    "curacao": "CW",
-    "czechia": "CZ",
-    "denmark": "DK",
-    "ecuador": "EC",
-    "egypt": "EG",
-    "england": "GB",
-    "france": "FR",
-    "germany": "DE",
-    "ghana": "GH",
-    "haiti": "HT",
-    "iran": "IR",
-    "iraq": "IQ",
-    "ireland": "IE",
-    "italy": "IT",
-    "japan": "JP",
-    "korea": "KR",
-    "southkorea": "KR",
-    "mexico": "MX",
-    "morocco": "MA",
-    "netherlands": "NL",
-    "newzealand": "NZ",
-    "nigeria": "NG",
-    "norway": "NO",
-    "paraguay": "PY",
-    "peru": "PE",
-    "poland": "PL",
-    "portugal": "PT",
-    "qatar": "QA",
-    "romania": "RO",
-    "saudiarabia": "SA",
-    "scotland": "GB",
-    "senegal": "SN",
-    "serbia": "RS",
-    "southafrica": "ZA",
-    "spain": "ES",
-    "sweden": "SE",
-    "switzerland": "CH",
-    "turkey": "TR",
-    "unitedstates": "US",
-    "uruguay": "UY",
-    "wales": "GB",
-    "tunisia": "TN",
+    "argentina": "🇦🇷",
+    "australia": "🇦🇺",
+    "austria": "🇦🇹",
+    "belgium": "🇧🇪",
+    "brazil": "🇧🇷",
+    "bosniaherzegovina": "🇧🇦",
+    "canada": "🇨🇦",
+    "cameroon": "🇨🇲",
+    "chile": "🇨🇱",
+    "colombia": "🇨🇴",
+    "croatia": "🇭🇷",
+    "curacao": "🇨🇼",
+    "czechia": "🇨🇿",
+    "denmark": "🇩🇰",
+    "ecuador": "🇪🇨",
+    "egypt": "🇪🇬",
+    "england": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+    "france": "🇫🇷",
+    "germany": "🇩🇪",
+    "ghana": "🇬🇭",
+    "haiti": "🇭🇹",
+    "iran": "🇮🇷",
+    "iraq": "🇮🇶",
+    "ireland": "🇮🇪",
+    "italy": "🇮🇹",
+    "japan": "🇯🇵",
+    "korea": "🇰🇷",
+    "southkorea": "🇰🇷",
+    "mexico": "🇲🇽",
+    "morocco": "🇲🇦",
+    "netherlands": "🇳🇱",
+    "newzealand": "🇳🇿",
+    "nigeria": "🇳🇬",
+    "norway": "🇳🇴",
+    "paraguay": "🇵🇾",
+    "peru": "🇵🇪",
+    "poland": "🇵🇱",
+    "portugal": "🇵🇹",
+    "qatar": "🇶🇦",
+    "romania": "🇷🇴",
+    "saudiarabia": "🇸🇦",
+    "scotland": "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+    "senegal": "🇸🇳",
+    "serbia": "🇷🇸",
+    "southafrica": "🇿🇦",
+    "spain": "🇪🇸",
+    "sweden": "🇸🇪",
+    "switzerland": "🇨🇭",
+    "turkey": "🇹🇷",
+    "unitedstates": "🇺🇸",
+    "uruguay": "🇺运行",
+    "wales": "🏴󠁧󠁢󠁷󠁬󠁳󠁿",
+    "tunisia": "🇹🇳",
 }
-
 
 def conectar():
     return sqlite3.connect(DB_PATH, check_same_thread=False)
@@ -563,16 +562,16 @@ else:
     st.caption(" | ".join(mensagens_sync))
 
 st.markdown("### Agenda e palpites")
-usuario = st.text_input("Digite seu nome para palpitar (agenda fica visível para todos):", placeholder="Seu nome")
+usuario = st.text_input("Digite seu nome:", placeholder="Seu nome")
 usuario = usuario.strip()
 autorizado = usuario_autorizado(usuario) if usuario else False
 
 if not usuario:
-    st.info("A agenda está liberada para visualização. Para palpitar, informe um nome da lista branca.")
+    st.info("A agenda está liberada para visualização. Para palpitar, informe um nome da lista.")
 elif not autorizado:
-    st.warning("Seu nome não está na lista branca. Você consegue ver a agenda, mas não consegue salvar palpites.")
+    st.warning("Seu nome não está na lista. Você consegue ver a agenda, mas não consegue salvar palpites.")
 else:
-    st.success(f"Nome autorizado para palpitar: {usuario}")
+    st.success(f"Usuário autorizado: {usuario}")
 
 col1, col2 = st.columns([1, 1])
 with col1:
@@ -636,7 +635,7 @@ with aba_palpites:
         elif autorizado:
             st.success("⏳ Palpite liberado.")
         else:
-            st.info("Visualização liberada. Para palpitar, use um nome autorizado da lista branca.")
+            st.info("Visualização liberada. Para palpitar, use um nome autorizado da lista.")
 
         c1, _, c2 = st.columns([2, 1, 2])
         with c1:
@@ -688,7 +687,7 @@ with aba_ranking:
         st.info("Nenhum palpite registrado ainda.")
 
     st.markdown("---")
-    st.write("📋 **Palpites vigentes (usados no ranking)**")
+    st.write("📋 **Palpites para o ranking**")
     if todos_palpites:
         for usuario_nome, jogo_id, pga, pgb, dt_reg in todos_palpites:
             jogo = mapa_jogos.get(jogo_id)
