@@ -619,16 +619,16 @@ if any("falhou" in m.lower() for m in mensagens_sync):
 else:
     st.caption(" | ".join(mensagens_sync))
 
-st.markdown("### Agenda e palpites")
-usuario = st.text_input("Digite seu nome para palpitar (agenda fica visível para todos):", placeholder="Seu nome").strip()
+st.markdown("### Usuário")
+usuario = st.text_input("Digite seu nome:", placeholder="Seu nome").strip()
 autorizado = usuario_autorizado(usuario) if usuario else False
 
 if not usuario:
-    st.info("A agenda está liberada para visualização. Para palpitar, informe um nome da lista branca.")
+    st.info("A agenda está liberada para visualização. Para registrar palpites, informe um usuário da lista.")
 elif not autorizado:
-    st.warning("Seu nome não está na lista branca. Você consegue ver a agenda, mas não consegue salvar palpites.")
+    st.warning("Seu usuário não está na lista. Você consegue ver a agenda, mas não consegue registrar palpites.")
 else:
-    st.success(f"Nome autorizado para palpitar: {usuario}")
+    st.success(f"Usuário autorizado para palpitar: {usuario}")
 
 col1, col2 = st.columns([1, 1])
 with col1:
@@ -692,7 +692,7 @@ with aba_palpites:
         elif autorizado:
             st.success("⏳ Palpite liberado.")
         else:
-            st.info("Visualização liberada. Para palpitar, use um nome autorizado da lista branca.")
+            st.info("Visualização liberada. Para registrar palpites, use um usuário autorizado.")
 
         c1, _, c2 = st.columns([2, 1, 2])
         with c1:
