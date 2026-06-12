@@ -704,12 +704,12 @@ with aba_palpites:
                     
                     # Mostra o placar que está salvo oficialmente embaixo do botão
                     if ja_palpitou:
-                        st.markdown(f"<div style='text-align: center; color: #10b981; font-size: 12px; margin-top: -12px;'>✅ Salvo: <b>{palpite_salvo_a} x {palpite_salvo_b}</b></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div style='text-align: center; color: #10b981; font-size: 12px; margin-top: -12px;'>✅ <b>{palpite_salvo_a} x {palpite_salvo_b}</b></div>", unsafe_allow_html=True)
                 else:
                     if ja_palpitou:
-                        st.markdown(f"<div style='text-align: center; color: gray; font-size: 14px; margin-top: 0px;'>🔒 Fechado<br><span style='font-size: 12px; color: #3b82f6;'><b>Seu palpite:<br>{palpite_salvo_a} x {palpite_salvo_b}</b></span></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div style='text-align: center; color: gray; font-size: 14px; margin-top: 0px;'>🔒 <br><span style='font-size: 12px; color: #3b82f6;'><b>Seu palpite:<br>{palpite_salvo_a} x {palpite_salvo_b}</b></span></div>", unsafe_allow_html=True)
                     else:
-                        st.markdown("<div style='text-align: center; color: gray; font-size: 14px; margin-top: 5px;'>🔒 Fechado<br><span style='font-size: 12px;'>Sem palpite</span></div>", unsafe_allow_html=True)
+                        st.markdown("<div style='text-align: center; color: gray; font-size: 14px; margin-top: 5px;'>🔒 <br><span style='font-size: 12px;'>Sem palpite</span></div>", unsafe_allow_html=True)
 
             # Esconde as Odds e data dentro de uma sanfona (expander)
             with st.expander(f"📅 {jogo['data_jogo'].strftime('%d/%m/%Y %H:%M')} | 📊 Ver Odds"):
