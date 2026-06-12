@@ -724,6 +724,7 @@ with aba_palpites:
                     st.caption("Odds indisponíveis no momento.")
 
 # --- NOVA ABA DE JOGOS FINALIZADOS ---
+# --- NOVA ABA DE JOGOS FINALIZADOS ---
 with aba_finalizados:
     if not jogos_finalizados:
         st.info("Nenhum jogo finalizado ainda.")
@@ -734,16 +735,34 @@ with aba_finalizados:
         nome_a = nome_time_ptbr(jogo["time_a"])
         nome_b = nome_time_ptbr(jogo["time_b"])
 
-        st.subheader(f"{flag_a} {nome_a} vs {flag_b} {nome_b}")
-        st.caption(f"Encerrado | Data: {jogo['data_jogo'].strftime('%d/%m/%Y %H:%M')}")
+        # Pega os gols reais de forma segura e converte para texto
+        gols_a = str(int(jogo["gols_real_a"])) if jogo["gols_real_a"] is not None else "-"
+        gols_b = str(int(jogo["gols_real_b"])) if jogo["gols_real_b"] is not None else "-"
 
-        # Pega os gols reais de forma segura
-        gols_a = int(jogo["gols_real_a"]) if jogo["gols_real_a"] is not None else "-"
-        gols_b = int(jogo["gols_real_b"]) if jogo["gols_real_b"] is not None else "-"
+        # Cria um "card" idêntico ao da agenda
+        with st.container(border=True):
+            
+            c_time_a, c_gols_a, c_x, c_gols_b, c_time_b, c_status = st.columns([3, 1, 0.5, 1, 3, 2])
+            
+            with c_time_a:
+                st.markdown(f"<div style='text-align: right; margin-top: 5px;'><b>{nome_a}</b> {flag_a}</div>", unsafe_allow_html=True)
+            
+            with c_gols_a:
+                # Placar oficial desenhado como uma caixinha preenchida para manter a harmonia visual
+                st.markdown(f"<div style='text-align: center; font-size: 16px; font-weight: bold; background-color: rgba(128, 128, 128, 0.1); border-radius: 6px; padding: 4px; margin-top: 2px;'>{gols_a}</div>", unsafe_allow_html=True)
+            
+            with c_x:
+                st.markdown("<div style='text-align: center; color: gray; margin-top: 5px;'>x</div>", unsafe_allow_html=True)
 
-        # Placar simplificado, sem input, sem odds
-        st.success(f"**Placar Oficial:** {nome_a} {gols_a} x {gols_b} {nome_b}")
-        st.markdown("---")
+            with c_gols_b:
+                st.markdown(f"<div style='text-align: center; font-size: 16px; font-weight: bold; background-color: rgba(128, 128, 128, 0.1); border-radius: 6px; padding: 4px; margin-top: 2px;'>{gols_b}</div>", unsafe_allow_html=True)
+                
+            with c_time_b:
+                st.markdown(f"<div style='text-align: left; margin-top: 5px;'>{flag_b} <b>{nome_b}</b></div>", unsafe_allow_html=True)
+            
+            with c_status:
+                # Onde ficava o botão "Salvar", colocamos um selo de "Finalizado" e a data do jogo
+                st.markdown(f"<div style='text-align: center; color: #10b981; font-size: 14px; margin-top: 0px;'><b>✅ Encerrado</b><br><span style='color: gray; font-size: 12px;'>{jogo['data_jogo'].strftime('%d/%m %H:%M')}</span></div>", unsafe_allow_html=True)
 
 with aba_ranking:
     conn = conectar()
