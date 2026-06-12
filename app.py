@@ -42,134 +42,86 @@ STATUS_MAP = {
 }
 
 TEAM_ALIASES = {
+    # EUA
     "usa": "unitedstates",
-    "unitedstatesofamerica": "unitedstates",
-    "unitedstates": "unitedstates",
     "u.s.a": "unitedstates",
-    "czechrepublic": "czechia",
+    "us": "unitedstates",
+    "unitedstates": "unitedstates",
+    "unitedstatesofamerica": "unitedstates",
+    # Coreia do Sul
+    "korea": "southkorea",
+    "southkorea": "southkorea",
+    "southkorearepublic": "southkorea",
     "republicofkorea": "southkorea",
     "korearepublic": "southkorea",
-    "southkorea": "southkorea",
-    "bosniaandherzegovina": "bosniaherzegovina",
+    # Bósnia
     "bosniaherzegovina": "bosniaherzegovina",
+    "bosniaandherzegovina": "bosniaherzegovina",
+    # Outros nomes compostos
+    "czechrepublic": "czechia",
     "curacao": "curacao",
-    "mexico": "mexico",
-    "netherlands": "netherlands",
+    "thenetherlands": "netherlands",
     "saudiarabia": "saudiarabia",
     "southafrica": "southafrica",
     "newzealand": "newzealand",
+    "costarica": "costarica",
 }
 
-TEAM_TO_FLAG = {
-    "argentina": "🇦🇷",
-    "australia": "🇦🇺",
-    "austria": "🇦🇹",
-    "belgium": "🇧🇪",
-    "brazil": "🇧🇷",
-    "bosniaherzegovina": "🇧🇦",
-    "canada": "🇨🇦",
-    "cameroon": "🇨🇲",
-    "chile": "🇨🇱",
-    "colombia": "🇨🇴",
-    "croatia": "🇭🇷",
-    "curacao": "🇨🇼",
-    "czechia": "🇨🇿",
-    "denmark": "🇩🇰",
-    "ecuador": "🇪🇨",
-    "egypt": "🇪🇬",
-    "england": "🏴",
-    "france": "🇫🇷",
-    "germany": "🇩🇪",
-    "ghana": "🇬🇭",
-    "haiti": "🇭🇹",
-    "iran": "🇮🇷",
-    "iraq": "🇮🇶",
-    "ireland": "🇮🇪",
-    "italy": "🇮🇹",
-    "japan": "🇯🇵",
-    "korea": "🇰🇷",
-    "southkorea": "🇰🇷",
-    "mexico": "🇲🇽",
-    "morocco": "🇲🇦",
-    "netherlands": "🇳🇱",
-    "newzealand": "🇳🇿",
-    "nigeria": "🇳🇬",
-    "norway": "🇳🇴",
-    "paraguay": "🇵🇾",
-    "peru": "🇵🇪",
-    "poland": "🇵🇱",
-    "portugal": "🇵🇹",
-    "qatar": "🇶🇦",
-    "romania": "🇷🇴",
-    "saudiarabia": "🇸🇦",
-    "scotland": "🏴",
-    "senegal": "🇸🇳",
-    "serbia": "🇷🇸",
-    "southafrica": "🇿🇦",
-    "spain": "🇪🇸",
-    "sweden": "🇸🇪",
-    "switzerland": "🇨🇭",
-    "turkey": "🇹🇷",
-    "unitedstates": "🇺🇸",
-    "uruguay": "🇺🇾",
-    "wales": "🏴",
-    "tunisia": "🇹🇳",
-}
-
-TEAM_TO_PTBR = {
-    "argentina": "Argentina",
-    "australia": "Austrália",
-    "austria": "Áustria",
-    "belgium": "Bélgica",
-    "brazil": "Brasil",
-    "bosniaherzegovina": "Bósnia e Herzegovina",
-    "canada": "Canadá",
-    "cameroon": "Camarões",
-    "chile": "Chile",
-    "colombia": "Colômbia",
-    "croatia": "Croácia",
-    "curacao": "Curaçao",
-    "czechia": "Tchéquia",
-    "denmark": "Dinamarca",
-    "ecuador": "Equador",
-    "egypt": "Egito",
-    "england": "Inglaterra",
-    "france": "França",
-    "germany": "Alemanha",
-    "ghana": "Gana",
-    "haiti": "Haiti",
-    "iran": "Irã",
-    "iraq": "Iraque",
-    "ireland": "Irlanda",
-    "italy": "Itália",
-    "japan": "Japão",
-    "korea": "Coreia do Sul",
-    "southkorea": "Coreia do Sul",
-    "mexico": "México",
-    "morocco": "Marrocos",
-    "netherlands": "Holanda",
-    "newzealand": "Nova Zelândia",
-    "nigeria": "Nigéria",
-    "norway": "Noruega",
-    "paraguay": "Paraguai",
-    "peru": "Peru",
-    "poland": "Polônia",
-    "portugal": "Portugal",
-    "qatar": "Catar",
-    "romania": "Romênia",
-    "saudiarabia": "Arábia Saudita",
-    "scotland": "Escócia",
-    "senegal": "Senegal",
-    "serbia": "Sérvia",
-    "southafrica": "África do Sul",
-    "spain": "Espanha",
-    "sweden": "Suécia",
-    "switzerland": "Suíça",
-    "turkey": "Turquia",
-    "unitedstates": "Estados Unidos",
-    "uruguay": "Uruguai",
-    "wales": "País de Gales",
-    "tunisia": "Tunísia",
+TEAM_META = {
+    "argentina": {"flag": "🇦🇷", "ptbr": "Argentina"},
+    "australia": {"flag": "🇦🇺", "ptbr": "Austrália"},
+    "austria": {"flag": "🇦🇹", "ptbr": "Áustria"},
+    "belgium": {"flag": "🇧🇪", "ptbr": "Bélgica"},
+    "brazil": {"flag": "🇧🇷", "ptbr": "Brasil"},
+    "bosniaherzegovina": {"flag": "🇧🇦", "ptbr": "Bósnia e Herzegovina"},
+    "canada": {"flag": "🇨🇦", "ptbr": "Canadá"},
+    "cameroon": {"flag": "🇨🇲", "ptbr": "Camarões"},
+    "chile": {"flag": "🇨🇱", "ptbr": "Chile"},
+    "colombia": {"flag": "🇨🇴", "ptbr": "Colômbia"},
+    "costarica": {"flag": "🇨🇷", "ptbr": "Costa Rica"},
+    "croatia": {"flag": "🇭🇷", "ptbr": "Croácia"},
+    "curacao": {"flag": "🇨🇼", "ptbr": "Curaçao"},
+    "czechia": {"flag": "🇨🇿", "ptbr": "Tchéquia"},
+    "denmark": {"flag": "🇩🇰", "ptbr": "Dinamarca"},
+    "ecuador": {"flag": "🇪🇨", "ptbr": "Equador"},
+    "egypt": {"flag": "🇪🇬", "ptbr": "Egito"},
+    # usando bandeira do Reino Unido para compatibilidade máxima
+    "england": {"flag": "🇬🇧", "ptbr": "Inglaterra"},
+    "france": {"flag": "🇫🇷", "ptbr": "França"},
+    "germany": {"flag": "🇩🇪", "ptbr": "Alemanha"},
+    "ghana": {"flag": "🇬🇭", "ptbr": "Gana"},
+    "haiti": {"flag": "🇭🇹", "ptbr": "Haiti"},
+    "iran": {"flag": "🇮🇷", "ptbr": "Irã"},
+    "iraq": {"flag": "🇮🇶", "ptbr": "Iraque"},
+    "ireland": {"flag": "🇮🇪", "ptbr": "Irlanda"},
+    "italy": {"flag": "🇮🇹", "ptbr": "Itália"},
+    "japan": {"flag": "🇯🇵", "ptbr": "Japão"},
+    "southkorea": {"flag": "🇰🇷", "ptbr": "Coreia do Sul"},
+    "mexico": {"flag": "🇲🇽", "ptbr": "México"},
+    "morocco": {"flag": "🇲🇦", "ptbr": "Marrocos"},
+    "netherlands": {"flag": "🇳🇱", "ptbr": "Holanda"},
+    "newzealand": {"flag": "🇳🇿", "ptbr": "Nova Zelândia"},
+    "nigeria": {"flag": "🇳🇬", "ptbr": "Nigéria"},
+    "norway": {"flag": "🇳🇴", "ptbr": "Noruega"},
+    "paraguay": {"flag": "🇵🇾", "ptbr": "Paraguai"},
+    "peru": {"flag": "🇵🇪", "ptbr": "Peru"},
+    "poland": {"flag": "🇵🇱", "ptbr": "Polônia"},
+    "portugal": {"flag": "🇵🇹", "ptbr": "Portugal"},
+    "qatar": {"flag": "🇶🇦", "ptbr": "Catar"},
+    "romania": {"flag": "🇷🇴", "ptbr": "Romênia"},
+    "saudiarabia": {"flag": "🇸🇦", "ptbr": "Arábia Saudita"},
+    "scotland": {"flag": "🇬🇧", "ptbr": "Escócia"},
+    "senegal": {"flag": "🇸🇳", "ptbr": "Senegal"},
+    "serbia": {"flag": "🇷🇸", "ptbr": "Sérvia"},
+    "southafrica": {"flag": "🇿🇦", "ptbr": "África do Sul"},
+    "spain": {"flag": "🇪🇸", "ptbr": "Espanha"},
+    "sweden": {"flag": "🇸🇪", "ptbr": "Suécia"},
+    "switzerland": {"flag": "🇨🇭", "ptbr": "Suíça"},
+    "turkey": {"flag": "🇹🇷", "ptbr": "Turquia"},
+    "unitedstates": {"flag": "🇺🇸", "ptbr": "Estados Unidos"},
+    "uruguay": {"flag": "🇺🇾", "ptbr": "Uruguai"},
+    "wales": {"flag": "🇬🇧", "ptbr": "País de Gales"},
+    "tunisia": {"flag": "🇹🇳", "ptbr": "Tunísia"},
 }
 
 
@@ -253,7 +205,14 @@ def normalizar_nome_time(nome: str) -> str:
 
 def nome_time_ptbr(nome_time: str) -> str:
     key = normalizar_nome_time(nome_time)
-    return TEAM_TO_PTBR.get(key, nome_time)
+    meta = TEAM_META.get(key)
+    return meta["ptbr"] if meta else nome_time
+
+
+def bandeira_time(nome_time: str) -> str:
+    key = normalizar_nome_time(nome_time)
+    meta = TEAM_META.get(key)
+    return meta["flag"] if meta else "🏳️"
 
 
 def nome_usuario_normalizado(nome: str) -> str:
@@ -275,11 +234,6 @@ def limpar_rotulo_time(rotulo: str) -> str:
         if palavras[:metade] == palavras[metade:]:
             rotulo = " ".join(palavras[:metade])
     return rotulo.strip(" -")
-
-
-def bandeira_time(nome_time: str) -> str:
-    key = normalizar_nome_time(nome_time)
-    return TEAM_TO_FLAG.get(key, "🏳️")
 
 
 def mapear_status(status_api: str) -> str:
@@ -624,11 +578,11 @@ usuario = st.text_input("Digite seu nome:", placeholder="Seu nome").strip()
 autorizado = usuario_autorizado(usuario) if usuario else False
 
 if not usuario:
-    st.info("A agenda está liberada para visualização. Para registrar palpites, informe um usuário da lista.")
+    st.info("A agenda está liberada para visualização. Para registrar palpites, informe um usuário autorizado.")
 elif not autorizado:
-    st.warning("Seu usuário não está na lista. Você consegue ver a agenda, mas não consegue registrar palpites.")
+    st.warning("Seu usuário não foi encontrado. Você consegue ver a agenda, mas não consegue registrar palpites.")
 else:
-    st.success(f"Usuário autorizado para palpitar: {usuario}")
+    st.success(f"Usuário autorizado para registrar palpites: {usuario}")
 
 col1, col2 = st.columns([1, 1])
 with col1:
@@ -661,8 +615,7 @@ with aba_palpites:
         st.caption(f"Status: {jogo['status']} | Horário: {jogo['data_jogo'].strftime('%d/%m/%Y %H:%M')}")
 
         if jogo["odd_time_a"] is not None and jogo["odd_empate"] is not None and jogo["odd_time_b"] is not None:
-            favorito_nome = determinar_favorito(nome_a, nome_b, jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"])[0]
-            odd_favorito = determinar_favorito(nome_a, nome_b, jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"])[1]
+            favorito_nome, odd_favorito = determinar_favorito(nome_a, nome_b, jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"])
             probs = calcular_probabilidades_implicitas(jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"])
 
             st.markdown(badge_favorito_markdown(favorito_nome, odd_favorito), unsafe_allow_html=True)
