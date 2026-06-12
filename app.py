@@ -610,32 +610,32 @@ if AUTOREFRESH_OK:
 
 st.title("🏆 Bolão da Copa 2026")
 
-    mensagens_sync = sincronizar_agenda_e_odds()
-    if any("falhou" in m.lower() for m in mensagens_sync):
-        st.warning(" | ".join(mensagens_sync))
-    else:
-        st.caption(" | ".join(mensagens_sync))
+mensagens_sync = sincronizar_agenda_e_odds()
+if any("falhou" in m.lower() for m in mensagens_sync):
+    st.warning(" | ".join(mensagens_sync))
+else:
+    st.caption(" | ".join(mensagens_sync))
 
-    # --- 1. BOTÃO DE ATUALIZAR (Movido para cima) ---
-    col1, col2 = st.columns([1, 1])
-    with col1:
-        if st.button("🔄 Atualizar agora", use_container_width=True):
-            buscar_jogos_api.clear()
-            buscar_odds_native_stats.clear()
-            st.rerun()
-    with col2:
-        st.caption("Atualização automática a cada 60 segundos.")
+# --- 1. BOTÃO DE ATUALIZAR (Movido para cima) ---
+col1, col2 = st.columns([1, 1])
+with col1:
+    if st.button("🔄 Atualizar agora", use_container_width=True):
+        buscar_jogos_api.clear()
+        buscar_odds_native_stats.clear()
+        st.rerun()
+with col2:
+    st.caption("Atualização automática a cada 60 segundos.")
 
-    # --- 2. CAMPO DE USUÁRIO (Logo abaixo do botão) ---
-    usuario = st.text_input("👤 Usuário:", placeholder="Digite seu nome para registrar os palpites...").strip()
-    autorizado = usuario_autorizado(usuario) if usuario else False
+# --- 2. CAMPO DE USUÁRIO (Logo abaixo do botão) ---
+usuario = st.text_input("👤 Usuário:", placeholder="Digite seu nome para registrar os palpites...").strip()
+autorizado = usuario_autorizado(usuario) if usuario else False
 
-    if not usuario:
-        st.info("A agenda está liberada para visualização. Para registrar palpites, informe um usuário autorizado.")
-    elif not autorizado:
-        st.warning("Seu usuário não foi encontrado. Você consegue ver a agenda, mas não consegue registrar palpites.")
-    else:
-        st.success(f"Usuário autorizado para registrar palpites: {usuario}")
+if not usuario:
+    st.info("A agenda está liberada para visualização. Para registrar palpites, informe um usuário autorizado.")
+elif not autorizado:
+    st.warning("Seu usuário não foi encontrado. Você consegue ver a agenda, mas não consegue registrar palpites.")
+else:
+    st.success(f"Usuário autorizado para registrar palpites: {usuario}")
 
 jogos_copa = carregar_jogos_do_banco()
 
