@@ -1,4 +1,3 @@
-pip install flag
 import re
 import sqlite3
 import unicodedata
@@ -111,204 +110,33 @@ TEAM_TO_COUNTRY = {
     "tunisia": "🇹🇳",
 }
 
-def conectar():
-    return sqlite3.connect(DB_PATH, check_same_thread=False)
-
-
-def adicionar_coluna_se_nao_existir(cursor, tabela, definicao_coluna):
-    try:
-        cursor.execute(f"ALTER TABLE {tabela} ADD COLUMN {definicao_coluna}")
-    except sqlite3.OperationalError as e:
-        if "duplicate column name" not in str(e).lower():
-            raise
-
-
-def inicializar_banco():
-    conn = conectar()
-    cur = conn.cursor()
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS palpites_placar (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            usuario TEXT NOT NULL,
-            jogo_id TEXT NOT NULL,
-            gols_time_a INTEGER NOT NULL,
-            gols_time_b INTEGER NOT NULL,
-            data_registro TEXT,
-            UNIQUE(usuario, jogo_id)
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS palpites_historico (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            usuario TEXT NOT NULL,
-            jogo_id TEXT NOT NULL,
-            gols_time_a INTEGER NOT NULL,
-            gols_time_b INTEGER NOT NULL,
-            data_registro TEXT NOT NULL
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS jogos_oficiais (
-            id TEXT PRIMARY KEY,
-            time_a TEXT NOT NULL,
-            time_b TEXT NOT NULL,
-            data_jogo TEXT NOT NULL,
-            gols_real_a INTEGER,
-            gols_real_b INTEGER,
-            status TEXT NOT NULL,
-            stage TEXT,
-            ultima_atualizacao TEXT
-        )
-    """)
-
-    adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odd_time_a REAL")
-    adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odd_empate REAL")
-    adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odd_time_b REAL")
-    adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odds_atualizadas_em TEXT")
-    adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "fonte_odds TEXT")
-
-    conn.commit()
-    conn.close()
-
-
-def normalizar_texto(txt: str) -> str:
-    txt = unicodedata.normalize("NFKD", txt or "")
-    txt = "".join(c for c in txt if not unicodedata.combining(c))
-    txt = txt.strip().lower()
-    txt = txt.replace("&", " and ")
-    txt = re.sub(r"[^a-z0-9 ]", " ", txt)
-    txt = re.sub(r"\s+", " ", txt).strip()
-    return txt
-
-
-def normalizar_nome_time(nome: str) -> str:
-    nome = normalizar_texto(nome).replace(" ", "")
-    return TEAM_ALIASES.get(nome, nome)
-
-
-def nome_usuario_normalizado(nome: str) -> str:
-    return normalizar_texto(nome)
-
-
-def usuario_autorizado(nome: str) -> bool:
-    if not nome:
-        return False
-    wl = {nome_usuario_normalizado(x) for x in WHITELIST_NOMES if x.strip()}
-    return nome_usuario_normalizado(nome) in wl
-
-
-def limpar_rotulo_time(rotulo: str) -> str:
-    rotulo = re.sub(r"\s+", " ", (rotulo or "").strip())
-    palavras = rotulo.split()
-    if len(palavras) % 2 == 0:
-        metade = len(palavras) // 2
-        if palavras[:metade] == palavras[metade:]:
-            rotulo = " ".join(palavras[:metade])
-    return rotulo.strip(" -")
-
-
-def flag_emoji_from_country_code(code: str) -> str:
-    if not code or len(code) != 2:
-        return "🏳️"
-    code = code.upper()
-    return ''.join(chr(127397 + ord(c)) for c in code)
-
-
-def bandeira_time(nome_time: str) -> str:
-    key = normalizar_nome_time(nome_time)
-    code = TEAM_TO_COUNTRY.get(key)
-    return flag_emoji_from_country_code(code) if code else "🏳️"
-
-
-def mapear_status(status_api: str) -> str:
-    return STATUS_MAP.get(status_api, status_api)
-
-
-def calcular_probabilidades_implicitas(odd_a, odd_e, odd_b):
-    if not odd_a or not odd_e or not odd_b:
-        return None
-    inv_a = 1 / float(odd_a)
-    inv_e = 1 / float(odd_e)
-    inv_b = 1 / float(odd_b)
-    soma = inv_a + inv_e + inv_b
-    if soma == 0:
-        return None
-    return {
-        "a": inv_a / soma * 100,
-        "e": inv_e / soma * 100,
-        "b": inv_b / soma * 100,
-    }
-
-
-def determinar_favorito(time_a, time_b, odd_a, odd_e, odd_b):
-    if odd_a is None or odd_e is None or odd_b is None:
-        return None, None
-    opcoes = {
-        time_a: float(odd_a),
-        "Empate": float(odd_e),
-        time_b: float(odd_b),
-    }
-    favorito = min(opcoes, key=opcoes.get)
-    return favorito, opcoes[favorito]
-
-
-def badge_favorito_markdown(favorito, odd):
-    if not favorito or odd is None:
-        return ""
-    cor = "#d1fae5" if favorito != "Empate" else "#fef3c7"
-    borda = "#10b981" if favorito != "Empate" else "#f59e0b"
-    return (
-        f"<div style='display:inline-block;padding:6px 10px;border-radius:999px;"
-        f"background:{cor};border:1px solid {borda};font-size:14px;font-weight:600;'>"
-        f"⭐ Favorito: {favorito} ({odd:.2f})"
-        f"</div>"
-    )
-
-
-@st.cache_data(ttl=60, show_spinner=False)
-def buscar_jogos_api():
-    headers = {"X-Auth-Token": API_TOKEN}
-    resp = requests.get(API_URL, headers=headers, timeout=20)
-    resp.raise_for_status()
-    dados = resp.json()
-
-    jogos = []
-    for item in dados.get("matches", []):
-        if item.get("stage") != "GROUP_STAGE":
-            continue
-
-        data_utc = datetime.fromisoformat(item["utcDate"].replace("Z", "+00:00"))
-        data_br = data_utc.astimezone(FUSO_BR)
-        score = item.get("score", {}) or {}
-        full_time = score.get("fullTime", {}) or {}
-
-        jogos.append({
-            "id": str(item["id"]),
-            "time_a": item["homeTeam"]["name"],
-            "time_b": item["awayTeam"]["name"],
-            "data_jogo": data_br.isoformat(),
-            "gols_real_a": full_time.get("home"),
-            "gols_real_b": full_time.get("away"),
-            "status": mapear_status(item.get("status")),
-            "stage": item.get("stage"),
-            "ultima_atualizacao": datetime.now(FUSO_BR).isoformat(),
-        })
-
-    return sorted(jogos, key=lambda x: x["data_jogo"])
-
-
-def extrair_secao_jogos(texto: str) -> str:
-    inicio = texto.find("Next matches:")
-    if inicio != -1:
-        texto = texto[inicio:]
-    fim = texto.find("Standings:")
-    if fim != -1:
-        texto = texto[:fim]
-    return texto
-
+TEAM_TO_PTBR = {
+    "argentina": "Argentina",
+    "australia": "Austrália",
+    "austria": "Áustria",
+    "belgium": "Bélgica",
+    "brazil": "Brasil",
+    "bosniaherzegovina": "Bósnia e Herzegovina",
+    "canada": "Canadá",
+    "cameroon": "Camarões",
+    "chile": "Chile",
+    "colombia": "Colômbia",
+    "croatia": "Croácia",
+    "curacao": "Curaçao",
+    "czechia": "Tchéquia",
+    "denmark": "Dinamarca",
+    "ecuador": "Equador",
+    "egypt": "Egito",
+    "england": "Inglaterra",
+    "france": "França",
+    "germany": "Alemanha",
+    "ghana": "Gana",
+    "haiti": "Haiti",
+    "iran": "Irã",
+    "iraq": "Iraque",
+    "ireland": "Irlanda",
+    "italy": "Itália",
+    "japan": "Japão",
 
 @st.cache_data(ttl=300, show_spinner=False)
 def buscar_odds_native_stats():
@@ -562,15 +390,15 @@ if any("falhou" in m.lower() for m in mensagens_sync):
 else:
     st.caption(" | ".join(mensagens_sync))
 
-st.markdown("### Agenda e palpites")
+st.markdown("### Usuário")
 usuario = st.text_input("Digite seu nome:", placeholder="Seu nome")
 usuario = usuario.strip()
 autorizado = usuario_autorizado(usuario) if usuario else False
 
 if not usuario:
-    st.info("A agenda está liberada para visualização. Para palpitar, informe um nome da lista.")
+    st.info("A agenda está liberada para visualização. Para registrar palpites, informe um usuário da lista.")
 elif not autorizado:
-    st.warning("Seu nome não está na lista. Você consegue ver a agenda, mas não consegue salvar palpites.")
+    st.warning("Seu nome não está na lista. Você consegue ver a agenda, mas não consegue registrar palpites.")
 else:
     st.success(f"Usuário autorizado: {usuario}")
 
@@ -636,7 +464,7 @@ with aba_palpites:
         elif autorizado:
             st.success("⏳ Palpite liberado.")
         else:
-            st.info("Visualização liberada. Para palpitar, use um nome autorizado da lista.")
+            st.info("Visualização liberada. Para registrar palpites, use um usuário autorizado.")
 
         c1, _, c2 = st.columns([2, 1, 2])
         with c1:
