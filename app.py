@@ -1,3 +1,4 @@
+pip install flag
 import re
 import sqlite3
 import unicodedata
@@ -71,7 +72,7 @@ TEAM_TO_COUNTRY = {
     "denmark": "🇩🇰",
     "ecuador": "🇪🇨",
     "egypt": "🇪🇬",
-    "england": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+    "england": "🏴",
     "france": "🇫🇷",
     "germany": "🇩🇪",
     "ghana": "🇬🇭",
@@ -96,7 +97,7 @@ TEAM_TO_COUNTRY = {
     "qatar": "🇶🇦",
     "romania": "🇷🇴",
     "saudiarabia": "🇸🇦",
-    "scotland": "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+    "scotland": "🏴",
     "senegal": "🇸🇳",
     "serbia": "🇷🇸",
     "southafrica": "🇿🇦",
@@ -105,8 +106,8 @@ TEAM_TO_COUNTRY = {
     "switzerland": "🇨🇭",
     "turkey": "🇹🇷",
     "unitedstates": "🇺🇸",
-    "uruguay": "🇺运行",
-    "wales": "🏴󠁧󠁢󠁷󠁬󠁳󠁿",
+    "uruguay": "🇺🇾",
+    "wales": "🏴",
     "tunisia": "🇹🇳",
 }
 
