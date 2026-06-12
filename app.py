@@ -69,6 +69,7 @@ TEAM_ALIASES = {
     "cotedivoire": "ivorycoast",
     "capeverde": "capeverde",
     "caboverde": "capeverde",
+    "capeverdeislands": "capeverde",
     "algeria": "algeria",
     "jordania": "jordan",
     "jordan": "jordan",
