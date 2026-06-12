@@ -20,6 +20,16 @@ API_TOKEN = "3ffa7e87c87e447ab012984b3026120a"
 NATIVE_STATS_URL = "https://native-stats.org/competition/WC/"
 API_LOGIN_EMAIL = "joicimara.pomagerskii@gmail.com"
 
+# =========================
+# AJUSTE AQUI A LISTA BRANCA
+# =========================
+WHITELIST_NOMES = [
+    "Joicimara",
+    "Vinicius",
+    "Otacilio",
+    # adicione mais nomes aqui
+]
+
 STATUS_MAP = {
     "SCHEDULED": "NS",
     "TIMED": "NS",
@@ -42,6 +52,62 @@ TEAM_ALIASES = {
     "bosniaherzegovina": "bosniaherzegovina",
     "curacao": "curacao",
     "mexico": "mexico",
+}
+
+TEAM_TO_COUNTRY = {
+    "argentina": "AR",
+    "australia": "AU",
+    "austria": "AT",
+    "belgium": "BE",
+    "brazil": "BR",
+    "bosniaherzegovina": "BA",
+    "canada": "CA",
+    "cameroon": "CM",
+    "chile": "CL",
+    "colombia": "CO",
+    "croatia": "HR",
+    "curacao": "CW",
+    "czechia": "CZ",
+    "denmark": "DK",
+    "ecuador": "EC",
+    "egypt": "EG",
+    "england": "GB",
+    "france": "FR",
+    "germany": "DE",
+    "ghana": "GH",
+    "haiti": "HT",
+    "iran": "IR",
+    "iraq": "IQ",
+    "ireland": "IE",
+    "italy": "IT",
+    "japan": "JP",
+    "korea": "KR",
+    "southkorea": "KR",
+    "mexico": "MX",
+    "morocco": "MA",
+    "netherlands": "NL",
+    "newzealand": "NZ",
+    "nigeria": "NG",
+    "norway": "NO",
+    "paraguay": "PY",
+    "peru": "PE",
+    "poland": "PL",
+    "portugal": "PT",
+    "qatar": "QA",
+    "romania": "RO",
+    "saudiarabia": "SA",
+    "scotland": "GB",
+    "senegal": "SN",
+    "serbia": "RS",
+    "southafrica": "ZA",
+    "spain": "ES",
+    "sweden": "SE",
+    "switzerland": "CH",
+    "turkey": "TR",
+    "unitedstates": "US",
+    "uruguay": "UY",
+    "wales": "GB",
+    "tunisia": "TN",
 }
 
 
@@ -70,6 +136,17 @@ def inicializar_banco():
             gols_time_b INTEGER NOT NULL,
             data_registro TEXT,
             UNIQUE(usuario, jogo_id)
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS palpites_historico (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario TEXT NOT NULL,
+            jogo_id TEXT NOT NULL,
+            gols_time_a INTEGER NOT NULL,
+            gols_time_b INTEGER NOT NULL,
+            data_registro TEXT NOT NULL
         )
     """)
 
@@ -112,6 +189,17 @@ def normalizar_nome_time(nome: str) -> str:
     return TEAM_ALIASES.get(nome, nome)
 
 
+def nome_usuario_normalizado(nome: str) -> str:
+    return normalizar_texto(nome)
+
+
+def usuario_autorizado(nome: str) -> bool:
+    if not nome:
+        return False
+    wl = {nome_usuario_normalizado(x) for x in WHITELIST_NOMES if x.strip()}
+    return nome_usuario_normalizado(nome) in wl
+
+
 def limpar_rotulo_time(rotulo: str) -> str:
     rotulo = re.sub(r"\s+", " ", (rotulo or "").strip())
     palavras = rotulo.split()
@@ -120,6 +208,19 @@ def limpar_rotulo_time(rotulo: str) -> str:
         if palavras[:metade] == palavras[metade:]:
             rotulo = " ".join(palavras[:metade])
     return rotulo.strip(" -")
+
+
+def flag_emoji_from_country_code(code: str) -> str:
+    if not code or len(code) != 2:
+        return "🏳️"
+    code = code.upper()
+    return ''.join(chr(127397 + ord(c)) for c in code)
+
+
+def bandeira_time(nome_time: str) -> str:
+    key = normalizar_nome_time(nome_time)
+    code = TEAM_TO_COUNTRY.get(key)
+    return flag_emoji_from_country_code(code) if code else "🏳️"
 
 
 def mapear_status(status_api: str) -> str:
@@ -292,10 +393,8 @@ def salvar_jogos_no_banco(jogos):
 def encontrar_jogo_por_times(indice, time_a, time_b):
     na = normalizar_nome_time(time_a)
     nb = normalizar_nome_time(time_b)
-
     if (na, nb) in indice:
         return indice[(na, nb)]
-
     for (db_a, db_b), jogo_id in indice.items():
         if (na in db_a or db_a in na) and (nb in db_b or db_b in nb):
             return jogo_id
@@ -399,6 +498,8 @@ def calcular_pontos(gp_a, gp_b, gr_a, gr_b):
 
 
 def buscar_palpite_usuario(usuario, jogo_id):
+    if not usuario:
+        return (0, 0)
     conn = conectar()
     cur = conn.cursor()
     cur.execute("SELECT gols_time_a, gols_time_b FROM palpites_placar WHERE usuario = ? AND jogo_id = ?", (usuario, jogo_id))
@@ -411,6 +512,14 @@ def salvar_palpite(usuario, jogo_id, gols_a, gols_b):
     horario_salvo = datetime.now(FUSO_BR).strftime("%d/%m/%Y %H:%M:%S")
     conn = conectar()
     cur = conn.cursor()
+
+    # histórico: salva TODAS as alterações
+    cur.execute("""
+        INSERT INTO palpites_historico (usuario, jogo_id, gols_time_a, gols_time_b, data_registro)
+        VALUES (?, ?, ?, ?, ?)
+    """, (usuario, jogo_id, gols_a, gols_b, horario_salvo))
+
+    # vigente: mantém apenas o último palpite do usuário para o jogo
     cur.execute("""
         INSERT INTO palpites_placar (usuario, jogo_id, gols_time_a, gols_time_b, data_registro)
         VALUES (?, ?, ?, ?, ?)
@@ -419,9 +528,24 @@ def salvar_palpite(usuario, jogo_id, gols_a, gols_b):
             gols_time_b = excluded.gols_time_b,
             data_registro = excluded.data_registro
     """, (usuario, jogo_id, gols_a, gols_b, horario_salvo))
+
     conn.commit()
     conn.close()
     return horario_salvo
+
+
+def carregar_historico(limit=300):
+    conn = conectar()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT usuario, jogo_id, gols_time_a, gols_time_b, data_registro
+          FROM palpites_historico
+         ORDER BY id DESC
+         LIMIT ?
+    """, (limit,))
+    rows = cur.fetchall()
+    conn.close()
+    return rows
 
 
 st.set_page_config(page_title="Bolão Copa 2026", layout="centered")
@@ -438,6 +562,18 @@ if any("falhou" in m.lower() for m in mensagens_sync):
 else:
     st.caption(" | ".join(mensagens_sync))
 
+st.markdown("### Agenda e palpites")
+usuario = st.text_input("Digite seu nome para palpitar (agenda fica visível para todos):", placeholder="Seu nome")
+usuario = usuario.strip()
+autorizado = usuario_autorizado(usuario) if usuario else False
+
+if not usuario:
+    st.info("A agenda está liberada para visualização. Para palpitar, informe um nome da lista branca.")
+elif not autorizado:
+    st.warning("Seu nome não está na lista branca. Você consegue ver a agenda, mas não consegue salvar palpites.")
+else:
+    st.success(f"Nome autorizado para palpitar: {usuario}")
+
 col1, col2 = st.columns([1, 1])
 with col1:
     if st.button("🔄 Atualizar agora", use_container_width=True):
@@ -448,81 +584,85 @@ with col2:
     st.caption("Atualização automática a cada 60 segundos.")
 
 jogos_copa = carregar_jogos_do_banco()
-aba_palpites, aba_ranking = st.tabs(["🔮 Palpites & Agenda", "📊 Ranking Geral"])
+aba_palpites, aba_ranking = st.tabs(["🔮 Agenda & Palpites", "📊 Ranking Geral"])
 
 with aba_palpites:
-    usuario = st.text_input("Insira seu nome para começar:", placeholder=" ").strip()
-    if usuario and not jogos_copa:
+    if not jogos_copa:
         st.info("Nenhum jogo disponível ainda.")
 
-    if usuario:
-        agora = datetime.now(FUSO_BR)
-        for jogo in jogos_copa:
-            foi_bloqueado = jogo["status"] == "FT" or agora >= jogo["data_jogo"]
-            palpite_salvo_a, palpite_salvo_b = buscar_palpite_usuario(usuario, jogo["id"])
+    agora = datetime.now(FUSO_BR)
+    for jogo in jogos_copa:
+        foi_bloqueado = jogo["status"] == "FT" or agora >= jogo["data_jogo"]
+        pode_palpitar = autorizado and not foi_bloqueado
+        palpite_salvo_a, palpite_salvo_b = buscar_palpite_usuario(usuario, jogo["id"])
 
-            st.subheader(f"🏟️ {jogo['time_a']} vs {jogo['time_b']}")
-            st.caption(f"Status: {jogo['status']} | Horário: {jogo['data_jogo'].strftime('%d/%m/%Y %H:%M')}")
+        flag_a = bandeira_time(jogo['time_a'])
+        flag_b = bandeira_time(jogo['time_b'])
+        st.subheader(f"{flag_a} {jogo['time_a']} vs {flag_b} {jogo['time_b']}")
+        st.caption(f"Status: {jogo['status']} | Horário: {jogo['data_jogo'].strftime('%d/%m/%Y %H:%M')}")
 
-            if jogo["odd_time_a"] is not None and jogo["odd_empate"] is not None and jogo["odd_time_b"] is not None:
-                favorito, odd_favorito = determinar_favorito(
-                    jogo["time_a"], jogo["time_b"], jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"]
-                )
-                probs = calcular_probabilidades_implicitas(
-                    jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"]
-                )
+        if jogo["odd_time_a"] is not None and jogo["odd_empate"] is not None and jogo["odd_time_b"] is not None:
+            favorito, odd_favorito = determinar_favorito(
+                jogo["time_a"], jogo["time_b"], jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"]
+            )
+            probs = calcular_probabilidades_implicitas(
+                jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"]
+            )
 
-                st.markdown(badge_favorito_markdown(favorito, odd_favorito), unsafe_allow_html=True)
-                st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+            st.markdown(badge_favorito_markdown(favorito, odd_favorito), unsafe_allow_html=True)
+            st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
-                c_odd1, c_oddx, c_odd2 = st.columns(3)
-                with c_odd1:
-                    st.metric(
-                        label=f"{jogo['time_a']}",
-                        value=f"{float(jogo['odd_time_a']):.2f}",
-                        delta=f"{probs['a']:.1f}%" if probs else None,
-                    )
-                with c_oddx:
-                    st.metric(
-                        label="Empate",
-                        value=f"{float(jogo['odd_empate']):.2f}",
-                        delta=f"{probs['e']:.1f}%" if probs else None,
-                    )
-                with c_odd2:
-                    st.metric(
-                        label=f"{jogo['time_b']}",
-                        value=f"{float(jogo['odd_time_b']):.2f}",
-                        delta=f"{probs['b']:.1f}%" if probs else None,
-                    )
+            c_odd1, c_oddx, c_odd2 = st.columns(3)
+            with c_odd1:
+                st.metric(label=f"{flag_a} {jogo['time_a']}", value=f"{float(jogo['odd_time_a']):.2f}", delta=f"{probs['a']:.1f}%" if probs else None)
+            with c_oddx:
+                st.metric(label="🤝 Empate", value=f"{float(jogo['odd_empate']):.2f}", delta=f"{probs['e']:.1f}%" if probs else None)
+            with c_odd2:
+                st.metric(label=f"{flag_b} {jogo['time_b']}", value=f"{float(jogo['odd_time_b']):.2f}", delta=f"{probs['b']:.1f}%" if probs else None)
 
-                if jogo.get("odds_atualizadas_em"):
-                    try:
-                        dt_odds = datetime.fromisoformat(jogo["odds_atualizadas_em"]).strftime('%d/%m/%Y %H:%M:%S')
-                        st.caption(f"Odds atualizadas em: {dt_odds} | Fonte: {jogo.get('fonte_odds', 'N/D')}")
-                    except Exception:
-                        st.caption(f"Fonte: {jogo.get('fonte_odds', 'N/D')}")
-            else:
-                st.caption("Odds indisponíveis no momento.")
+            if jogo.get("odds_atualizadas_em"):
+                try:
+                    dt_odds = datetime.fromisoformat(jogo["odds_atualizadas_em"]).strftime('%d/%m/%Y %H:%M:%S')
+                    st.caption(f"Odds atualizadas em: {dt_odds} | Fonte: {jogo.get('fonte_odds', 'N/D')}")
+                except Exception:
+                    st.caption(f"Fonte: {jogo.get('fonte_odds', 'N/D')}")
+        else:
+            st.caption("Odds indisponíveis no momento.")
 
-            if foi_bloqueado:
-                st.error("🔒 Palpites encerrados para esta partida.")
-                if jogo["gols_real_a"] is not None and jogo["gols_real_b"] is not None:
-                    st.info(f"Placar oficial: {jogo['time_a']} {int(jogo['gols_real_a'])} x {int(jogo['gols_real_b'])} {jogo['time_b']}")
-            else:
-                st.success("⏳ Palpite liberado.")
+        if foi_bloqueado:
+            st.error("🔒 Palpites encerrados para esta partida.")
+            if jogo["gols_real_a"] is not None and jogo["gols_real_b"] is not None:
+                st.info(f"Placar oficial: {jogo['time_a']} {int(jogo['gols_real_a'])} x {int(jogo['gols_real_b'])} {jogo['time_b']}")
+        elif autorizado:
+            st.success("⏳ Palpite liberado.")
+        else:
+            st.info("Visualização liberada. Para palpitar, use um nome autorizado da lista branca.")
 
-            c1, _, c2 = st.columns([2, 1, 2])
-            with c1:
-                gols_a = st.number_input(f"Gols {jogo['time_a']}", min_value=0, max_value=20, value=int(palpite_salvo_a), key=f"ga_{jogo['id']}", disabled=foi_bloqueado)
-            with c2:
-                gols_b = st.number_input(f"Gols {jogo['time_b']}", min_value=0, max_value=20, value=int(palpite_salvo_b), key=f"gb_{jogo['id']}", disabled=foi_bloqueado)
+        c1, _, c2 = st.columns([2, 1, 2])
+        with c1:
+            gols_a = st.number_input(
+                f"Gols {jogo['time_a']}",
+                min_value=0, max_value=20,
+                value=int(palpite_salvo_a),
+                key=f"ga_{jogo['id']}",
+                disabled=not pode_palpitar,
+            )
+        with c2:
+            gols_b = st.number_input(
+                f"Gols {jogo['time_b']}",
+                min_value=0, max_value=20,
+                value=int(palpite_salvo_b),
+                key=f"gb_{jogo['id']}",
+                disabled=not pode_palpitar,
+            )
 
-            if not foi_bloqueado:
-                if st.button(f"Salvar {gols_a} x {gols_b}", key=f"btn_{jogo['id']}", use_container_width=True):
-                    horario = salvar_palpite(usuario, jogo["id"], gols_a, gols_b)
-                    st.success(f"Palpite salvo às {horario}.")
-                    st.rerun()
-            st.markdown("---")
+        if pode_palpitar:
+            if st.button(f"Salvar {gols_a} x {gols_b}", key=f"btn_{jogo['id']}", use_container_width=True):
+                horario = salvar_palpite(usuario, jogo["id"], gols_a, gols_b)
+                st.success(f"Palpite salvo às {horario}. O histórico de alterações foi registrado.")
+                st.rerun()
+
+        st.markdown("---")
 
 with aba_ranking:
     conn = conectar()
@@ -544,11 +684,24 @@ with aba_ranking:
     if ranking:
         for pos, (usuario_nome, pontos) in enumerate(ranking, start=1):
             st.write(f"**{pos}º Lugar:** {usuario_nome} — 🌟 {pontos} pontos")
-        st.markdown("---")
-        st.write("📋 **Histórico de Palpites**")
+    else:
+        st.info("Nenhum palpite registrado ainda.")
+
+    st.markdown("---")
+    st.write("📋 **Palpites vigentes (usados no ranking)**")
+    if todos_palpites:
         for usuario_nome, jogo_id, pga, pgb, dt_reg in todos_palpites:
             jogo = mapa_jogos.get(jogo_id)
             if jogo:
-                st.caption(f"⏱️ {usuario_nome} enviou {pga}x{pgb} ({jogo['time_a']} x {jogo['time_b']}) em: {dt_reg}")
+                st.caption(f"⏱️ {usuario_nome} → {pga}x{pgb} ({jogo['time_a']} x {jogo['time_b']}) em: {dt_reg}")
+
+    st.markdown("---")
+    st.write("🕘 **Histórico de alterações**")
+    historico = carregar_historico(limit=500)
+    if historico:
+        for usuario_nome, jogo_id, pga, pgb, dt_reg in historico:
+            jogo = mapa_jogos.get(jogo_id)
+            if jogo:
+                st.caption(f"{dt_reg} • {usuario_nome} alterou para {pga}x{pgb} em {jogo['time_a']} x {jogo['time_b']}")
     else:
-        st.info("Nenhum palpite registrado ainda.")
+        st.info("Nenhuma alteração registrada ainda.")
