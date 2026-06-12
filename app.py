@@ -791,7 +791,7 @@ with aba_finalizados:
             elif ja_palpitou:
                 st.markdown(f"<div style='text-align: center; font-size: 14px; color: gray;'>Seu palpite: <b>{pga} x {pgb}</b> (Aguardando placar oficial)</div>", unsafe_allow_html=True)
             else:
-                st.markdown("<div style='text-align: center; font-size: 14px; color: gray;'><i>Você não palpitou neste jogo.</i></div>", unsafe_allow_html=True)
+                st.markdown("<div style='text-align: center; font-size: 14px; color: gray;'><i>Nenhum palpite do usuário para este jogo.</i></div>", unsafe_allow_html=True)
 
 with aba_ranking:
     agora = datetime.now(FUSO_BR) # Necessário para checar se o jogo já começou
