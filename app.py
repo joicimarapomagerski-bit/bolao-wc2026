@@ -7,7 +7,6 @@ from zoneinfo import ZoneInfo
 import requests
 import streamlit as st
 
-# Auto refresh opcional
 try:
     from streamlit_autorefresh import st_autorefresh
     AUTOREFRESH_OK = True
@@ -19,7 +18,7 @@ DB_PATH = "bolao.db"
 API_URL = "https://api.football-data.org/v4/competitions/WC/matches"
 API_TOKEN = "3ffa7e87c87e447ab012984b3026120a"
 NATIVE_STATS_URL = "https://native-stats.org/competition/WC/"
-API_LOGIN_EMAIL = "joicimara.pomagerskii@gmail.com"  # usar se algum fluxo futuro da API exigir login manual
+API_LOGIN_EMAIL = "joicimara.pomagerskii@gmail.com"
 
 STATUS_MAP = {
     "SCHEDULED": "NS",
@@ -35,12 +34,14 @@ STATUS_MAP = {
 TEAM_ALIASES = {
     "usa": "unitedstates",
     "unitedstatesofamerica": "unitedstates",
+    "u.s.a": "unitedstates",
     "czechrepublic": "czechia",
     "republicofkorea": "southkorea",
     "korearepublic": "southkorea",
     "bosniaandherzegovina": "bosniaherzegovina",
+    "bosniaherzegovina": "bosniaherzegovina",
     "curacao": "curacao",
-    "méxico": "mexico",
+    "mexico": "mexico",
 }
 
 
@@ -49,12 +50,11 @@ def conectar():
 
 
 def adicionar_coluna_se_nao_existir(cursor, tabela, definicao_coluna):
-    nome_coluna = definicao_coluna.split()[0]
     try:
         cursor.execute(f"ALTER TABLE {tabela} ADD COLUMN {definicao_coluna}")
     except sqlite3.OperationalError as e:
         if "duplicate column name" not in str(e).lower():
-            raise e
+            raise
 
 
 def inicializar_banco():
@@ -87,7 +87,6 @@ def inicializar_banco():
         )
     """)
 
-    # Colunas extras para odds
     adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odd_time_a REAL")
     adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odd_empate REAL")
     adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odd_time_b REAL")
@@ -98,19 +97,74 @@ def inicializar_banco():
     conn.close()
 
 
+def normalizar_texto(txt: str) -> str:
+    txt = unicodedata.normalize("NFKD", txt or "")
+    txt = "".join(c for c in txt if not unicodedata.combining(c))
+    txt = txt.strip().lower()
+    txt = txt.replace("&", " and ")
+    txt = re.sub(r"[^a-z0-9 ]", " ", txt)
+    txt = re.sub(r"\s+", " ", txt).strip()
+    return txt
+
+
+def normalizar_nome_time(nome: str) -> str:
+    nome = normalizar_texto(nome).replace(" ", "")
+    return TEAM_ALIASES.get(nome, nome)
+
+
+def limpar_rotulo_time(rotulo: str) -> str:
+    rotulo = re.sub(r"\s+", " ", (rotulo or "").strip())
+    palavras = rotulo.split()
+    if len(palavras) % 2 == 0:
+        metade = len(palavras) // 2
+        if palavras[:metade] == palavras[metade:]:
+            rotulo = " ".join(palavras[:metade])
+    return rotulo.strip(" -")
+
+
 def mapear_status(status_api: str) -> str:
     return STATUS_MAP.get(status_api, status_api)
 
 
-def normalizar_nome_time(nome: str) -> str:
-    if not nome:
+def calcular_probabilidades_implicitas(odd_a, odd_e, odd_b):
+    if not odd_a or not odd_e or not odd_b:
+        return None
+    inv_a = 1 / float(odd_a)
+    inv_e = 1 / float(odd_e)
+    inv_b = 1 / float(odd_b)
+    soma = inv_a + inv_e + inv_b
+    if soma == 0:
+        return None
+    return {
+        "a": inv_a / soma * 100,
+        "e": inv_e / soma * 100,
+        "b": inv_b / soma * 100,
+    }
+
+
+def determinar_favorito(time_a, time_b, odd_a, odd_e, odd_b):
+    if odd_a is None or odd_e is None or odd_b is None:
+        return None, None
+    opcoes = {
+        time_a: float(odd_a),
+        "Empate": float(odd_e),
+        time_b: float(odd_b),
+    }
+    favorito = min(opcoes, key=opcoes.get)
+    return favorito, opcoes[favorito]
+
+
+def badge_favorito_markdown(favorito, odd):
+    if not favorito or odd is None:
         return ""
-    nome = unicodedata.normalize("NFKD", nome)
-    nome = "".join(c for c in nome if not unicodedata.combining(c))
-    nome = nome.lower().strip()
-    nome = nome.replace("&", "and")
-    nome = re.sub(r"[^a-z0-9]", "", nome)
-    return TEAM_ALIASES.get(nome, nome)
+    cor = "#d1fae5" if favorito != "Empate" else "#fef3c7"
+    borda = "#10b981" if favorito != "Empate" else "#f59e0b"
+    return (
+        f"<div style='display:inline-block;padding:6px 10px;border-radius:999px;"
+        f"background:{cor};border:1px solid {borda};font-size:14px;font-weight:600;'>"
+        f"⭐ Favorito: {favorito} ({odd:.2f})"
+        f"</div>"
+    )
 
 
 @st.cache_data(ttl=60, show_spinner=False)
@@ -145,12 +199,18 @@ def buscar_jogos_api():
     return sorted(jogos, key=lambda x: x["data_jogo"])
 
 
+def extrair_secao_jogos(texto: str) -> str:
+    inicio = texto.find("Next matches:")
+    if inicio != -1:
+        texto = texto[inicio:]
+    fim = texto.find("Standings:")
+    if fim != -1:
+        texto = texto[:fim]
+    return texto
+
+
 @st.cache_data(ttl=300, show_spinner=False)
 def buscar_odds_native_stats():
-    """
-    Extrai odds 1X2 da página pública da competição da Copa no Native Stats.
-    Formato esperado na página: 1.47 / 4.11 / 6.79
-    """
     headers = {
         "User-Agent": "Mozilla/5.0",
         "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
@@ -159,16 +219,14 @@ def buscar_odds_native_stats():
     resp.raise_for_status()
     html = resp.text
 
-    # Reduz ruído do HTML
     texto = re.sub(r"<[^>]+>", " ", html)
     texto = texto.replace("\xa0", " ")
     texto = re.sub(r"\s+", " ", texto)
+    texto = extrair_secao_jogos(texto)
 
-    # Captura somente jogos com odds 1X2 presentes
     padrao = re.compile(
         r"(20\d{2}/\d{2}/\d{2},\s*\d{2}h\d{2})\s+"
-        r"([A-Za-zÀ-ÿ'\- ]+?)\s+([A-Z]{3})\s+-\s+"
-        r"([A-Za-zÀ-ÿ'\- ]+?)\s+([A-Z]{3})\s+"
+        r"(.+?)\s+([A-Z]{3})\s+-\s+(.+?)\s+([A-Z]{3})\s+"
         r"([0-9]+(?:\.[0-9]+)?)\s*/\s*([0-9]+(?:\.[0-9]+)?)\s*/\s*([0-9]+(?:\.[0-9]+)?)"
     )
 
@@ -176,13 +234,10 @@ def buscar_odds_native_stats():
     vistos = set()
     for m in padrao.finditer(texto):
         data_txt = m.group(1)
-        time_a = " ".join(m.group(2).split())
-        sigla_a = m.group(3).strip()
-        time_b = " ".join(m.group(4).split())
-        sigla_b = m.group(5).strip()
-        odd_a = float(m.group(6))
-        odd_e = float(m.group(7))
-        odd_b = float(m.group(8))
+        time_a = limpar_rotulo_time(m.group(2))
+        time_b = limpar_rotulo_time(m.group(4))
+        if not time_a or not time_b:
+            continue
 
         chave = (normalizar_nome_time(time_a), normalizar_nome_time(time_b), data_txt)
         if chave in vistos:
@@ -190,30 +245,27 @@ def buscar_odds_native_stats():
         vistos.add(chave)
 
         try:
-            dt = datetime.strptime(data_txt, "%Y/%m/%d, %Hh%M").replace(tzinfo=FUSO_BR)
+            data_jogo = datetime.strptime(data_txt, "%Y/%m/%d, %Hh%M").replace(tzinfo=FUSO_BR)
         except Exception:
-            dt = None
+            data_jogo = None
 
         odds.append({
             "time_a": time_a,
-            "sigla_a": sigla_a,
             "time_b": time_b,
-            "sigla_b": sigla_b,
-            "data_jogo": dt,
-            "odd_time_a": odd_a,
-            "odd_empate": odd_e,
-            "odd_time_b": odd_b,
-            "fonte_odds": "native-stats",
+            "data_jogo": data_jogo,
+            "odd_time_a": float(m.group(6)),
+            "odd_empate": float(m.group(7)),
+            "odd_time_b": float(m.group(8)),
             "odds_atualizadas_em": datetime.now(FUSO_BR).isoformat(),
+            "fonte_odds": "native-stats",
         })
 
     return odds
 
 
-def salvar_jogos_no_banco(jogos: list[dict]):
+def salvar_jogos_no_banco(jogos):
     conn = conectar()
     cur = conn.cursor()
-
     for jogo in jogos:
         cur.execute("""
             INSERT INTO jogos_oficiais (
@@ -233,12 +285,24 @@ def salvar_jogos_no_banco(jogos: list[dict]):
             jogo["gols_real_a"], jogo["gols_real_b"], jogo["status"],
             jogo["stage"], jogo["ultima_atualizacao"]
         ))
-
     conn.commit()
     conn.close()
 
 
-def salvar_odds_no_banco(lista_odds: list[dict]):
+def encontrar_jogo_por_times(indice, time_a, time_b):
+    na = normalizar_nome_time(time_a)
+    nb = normalizar_nome_time(time_b)
+
+    if (na, nb) in indice:
+        return indice[(na, nb)]
+
+    for (db_a, db_b), jogo_id in indice.items():
+        if (na in db_a or db_a in na) and (nb in db_b or db_b in nb):
+            return jogo_id
+    return None
+
+
+def salvar_odds_no_banco(lista_odds):
     conn = conectar()
     cur = conn.cursor()
     cur.execute("SELECT id, time_a, time_b FROM jogos_oficiais")
@@ -246,28 +310,21 @@ def salvar_odds_no_banco(lista_odds: list[dict]):
 
     indice = {}
     for jogo_id, time_a, time_b in jogos_db:
-        chave = (normalizar_nome_time(time_a), normalizar_nome_time(time_b))
-        indice[chave] = jogo_id
+        indice[(normalizar_nome_time(time_a), normalizar_nome_time(time_b))] = jogo_id
 
     atualizados = 0
     for item in lista_odds:
-        chave = (normalizar_nome_time(item["time_a"]), normalizar_nome_time(item["time_b"]))
-        jogo_id = indice.get(chave)
+        jogo_id = encontrar_jogo_por_times(indice, item["time_a"], item["time_b"])
         if not jogo_id:
             continue
-
         cur.execute("""
             UPDATE jogos_oficiais
-            SET odd_time_a = ?, odd_empate = ?, odd_time_b = ?,
-                odds_atualizadas_em = ?, fonte_odds = ?
-            WHERE id = ?
+               SET odd_time_a = ?, odd_empate = ?, odd_time_b = ?,
+                   odds_atualizadas_em = ?, fonte_odds = ?
+             WHERE id = ?
         """, (
-            item["odd_time_a"],
-            item["odd_empate"],
-            item["odd_time_b"],
-            item["odds_atualizadas_em"],
-            item["fonte_odds"],
-            jogo_id,
+            item["odd_time_a"], item["odd_empate"], item["odd_time_b"],
+            item["odds_atualizadas_em"], item["fonte_odds"], jogo_id
         ))
         if cur.rowcount:
             atualizados += 1
@@ -283,8 +340,8 @@ def carregar_jogos_do_banco():
     cur.execute("""
         SELECT id, time_a, time_b, data_jogo, gols_real_a, gols_real_b, status,
                ultima_atualizacao, odd_time_a, odd_empate, odd_time_b, odds_atualizadas_em, fonte_odds
-        FROM jogos_oficiais
-        ORDER BY data_jogo
+          FROM jogos_oficiais
+         ORDER BY data_jogo
     """)
     rows = cur.fetchall()
     conn.close()
@@ -313,11 +370,8 @@ def sincronizar_agenda_e_odds():
     msgs = []
     try:
         jogos = buscar_jogos_api()
-        if jogos:
-            salvar_jogos_no_banco(jogos)
-            msgs.append(f"Agenda OK ({len(jogos)} jogos)")
-        else:
-            msgs.append("Agenda vazia")
+        salvar_jogos_no_banco(jogos)
+        msgs.append(f"Agenda OK ({len(jogos)} jogos)")
     except Exception as e:
         msgs.append(f"Agenda falhou: {e}")
 
@@ -327,17 +381,14 @@ def sincronizar_agenda_e_odds():
         msgs.append(f"Odds OK ({atualizados} jogos atualizados)")
     except Exception as e:
         msgs.append(f"Odds falharam: {e}")
-
     return msgs
 
 
 def calcular_pontos(gp_a, gp_b, gr_a, gr_b):
     if gr_a is None or gr_b is None:
         return 0
-
     vencedor_real = "A" if gr_a > gr_b else ("B" if gr_b > gr_a else "Empate")
     vencedor_palpite = "A" if gp_a > gp_b else ("B" if gp_b > gp_a else "Empate")
-
     if gp_a == gr_a and gp_b == gr_b:
         return 25
     if vencedor_palpite == vencedor_real and (gp_a - gp_b) == (gr_a - gr_b):
@@ -347,19 +398,16 @@ def calcular_pontos(gp_a, gp_b, gr_a, gr_b):
     return 0
 
 
-def buscar_palpite_usuario(usuario: str, jogo_id: str):
+def buscar_palpite_usuario(usuario, jogo_id):
     conn = conectar()
     cur = conn.cursor()
-    cur.execute(
-        "SELECT gols_time_a, gols_time_b FROM palpites_placar WHERE usuario = ? AND jogo_id = ?",
-        (usuario, jogo_id),
-    )
+    cur.execute("SELECT gols_time_a, gols_time_b FROM palpites_placar WHERE usuario = ? AND jogo_id = ?", (usuario, jogo_id))
     row = cur.fetchone()
     conn.close()
     return row if row else (0, 0)
 
 
-def salvar_palpite(usuario: str, jogo_id: str, gols_a: int, gols_b: int):
+def salvar_palpite(usuario, jogo_id, gols_a, gols_b):
     horario_salvo = datetime.now(FUSO_BR).strftime("%d/%m/%Y %H:%M:%S")
     conn = conectar()
     cur = conn.cursor()
@@ -404,7 +452,6 @@ aba_palpites, aba_ranking = st.tabs(["🔮 Palpites & Agenda", "📊 Ranking Ger
 
 with aba_palpites:
     usuario = st.text_input("Insira seu nome para começar:", placeholder=" ").strip()
-
     if usuario and not jogos_copa:
         st.info("Nenhum jogo disponível ainda.")
 
@@ -417,12 +464,45 @@ with aba_palpites:
             st.subheader(f"🏟️ {jogo['time_a']} vs {jogo['time_b']}")
             st.caption(f"Status: {jogo['status']} | Horário: {jogo['data_jogo'].strftime('%d/%m/%Y %H:%M')}")
 
-            if jogo["odd_time_a"] is not None:
-                st.caption(
-                    f"Odds 1X2: {jogo['time_a']} {float(jogo['odd_time_a']):.2f} | "
-                    f"Empate {float(jogo['odd_empate']):.2f} | "
-                    f"{jogo['time_b']} {float(jogo['odd_time_b']):.2f}"
+            if jogo["odd_time_a"] is not None and jogo["odd_empate"] is not None and jogo["odd_time_b"] is not None:
+                favorito, odd_favorito = determinar_favorito(
+                    jogo["time_a"], jogo["time_b"], jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"]
                 )
+                probs = calcular_probabilidades_implicitas(
+                    jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"]
+                )
+
+                st.markdown(badge_favorito_markdown(favorito, odd_favorito), unsafe_allow_html=True)
+                st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
+                c_odd1, c_oddx, c_odd2 = st.columns(3)
+                with c_odd1:
+                    st.metric(
+                        label=f"{jogo['time_a']}",
+                        value=f"{float(jogo['odd_time_a']):.2f}",
+                        delta=f"{probs['a']:.1f}%" if probs else None,
+                    )
+                with c_oddx:
+                    st.metric(
+                        label="Empate",
+                        value=f"{float(jogo['odd_empate']):.2f}",
+                        delta=f"{probs['e']:.1f}%" if probs else None,
+                    )
+                with c_odd2:
+                    st.metric(
+                        label=f"{jogo['time_b']}",
+                        value=f"{float(jogo['odd_time_b']):.2f}",
+                        delta=f"{probs['b']:.1f}%" if probs else None,
+                    )
+
+                if jogo.get("odds_atualizadas_em"):
+                    try:
+                        dt_odds = datetime.fromisoformat(jogo["odds_atualizadas_em"]).strftime('%d/%m/%Y %H:%M:%S')
+                        st.caption(f"Odds atualizadas em: {dt_odds} | Fonte: {jogo.get('fonte_odds', 'N/D')}")
+                    except Exception:
+                        st.caption(f"Fonte: {jogo.get('fonte_odds', 'N/D')}")
+            else:
+                st.caption("Odds indisponíveis no momento.")
 
             if foi_bloqueado:
                 st.error("🔒 Palpites encerrados para esta partida.")
@@ -433,22 +513,15 @@ with aba_palpites:
 
             c1, _, c2 = st.columns([2, 1, 2])
             with c1:
-                gols_a = st.number_input(
-                    f"Gols {jogo['time_a']}", min_value=0, max_value=20,
-                    value=int(palpite_salvo_a), key=f"ga_{jogo['id']}", disabled=foi_bloqueado
-                )
+                gols_a = st.number_input(f"Gols {jogo['time_a']}", min_value=0, max_value=20, value=int(palpite_salvo_a), key=f"ga_{jogo['id']}", disabled=foi_bloqueado)
             with c2:
-                gols_b = st.number_input(
-                    f"Gols {jogo['time_b']}", min_value=0, max_value=20,
-                    value=int(palpite_salvo_b), key=f"gb_{jogo['id']}", disabled=foi_bloqueado
-                )
+                gols_b = st.number_input(f"Gols {jogo['time_b']}", min_value=0, max_value=20, value=int(palpite_salvo_b), key=f"gb_{jogo['id']}", disabled=foi_bloqueado)
 
             if not foi_bloqueado:
                 if st.button(f"Salvar {gols_a} x {gols_b}", key=f"btn_{jogo['id']}", use_container_width=True):
                     horario = salvar_palpite(usuario, jogo["id"], gols_a, gols_b)
                     st.success(f"Palpite salvo às {horario}.")
                     st.rerun()
-
             st.markdown("---")
 
 with aba_ranking:
@@ -460,7 +533,6 @@ with aba_ranking:
 
     pontuacao = {}
     mapa_jogos = {j["id"]: j for j in jogos_copa}
-
     for usuario_nome, jogo_id, pga, pgb, _ in todos_palpites:
         pontuacao.setdefault(usuario_nome, 0)
         jogo = mapa_jogos.get(jogo_id)
@@ -468,13 +540,10 @@ with aba_ranking:
             pontuacao[usuario_nome] += calcular_pontos(pga, pgb, jogo["gols_real_a"], jogo["gols_real_b"])
 
     ranking = sorted(pontuacao.items(), key=lambda x: x[1], reverse=True)
-
     st.subheader("🏅 Classificação dos Participantes")
     if ranking:
-        for pos, usuario_info in enumerate(ranking, start=1):
-            usuario_nome, pontos = usuario_info
+        for pos, (usuario_nome, pontos) in enumerate(ranking, start=1):
             st.write(f"**{pos}º Lugar:** {usuario_nome} — 🌟 {pontos} pontos")
-
         st.markdown("---")
         st.write("📋 **Histórico de Palpites**")
         for usuario_nome, jogo_id, pga, pgb, dt_reg in todos_palpites:
