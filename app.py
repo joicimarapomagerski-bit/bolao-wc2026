@@ -740,7 +740,6 @@ with aba_palpites:
                 else:
                     st.caption("Odds indisponíveis no momento.")
 
-# --- NOVA ABA DE JOGOS FINALIZADOS ---
 with aba_finalizados:
     if not jogos_finalizados:
         st.info("Nenhum jogo finalizado ainda.")
@@ -806,17 +805,20 @@ with aba_ranking:
 
     pontuacao = {}
     mapa_jogos = {j["id"]: j for j in jogos_copa}
+    
+    # 1. Aplica o .title() no cálculo da pontuação para unificar nomes e exibir maiúsculo
     for usuario_nome, jogo_id, pga, pgb, _ in todos_palpites:
-        pontuacao.setdefault(usuario_nome, 0)
+        nome_formatado = usuario_nome.title() 
+        pontuacao.setdefault(nome_formatado, 0)
         jogo = mapa_jogos.get(jogo_id)
         if jogo:
-            pontuacao[usuario_nome] += calcular_pontos(pga, pgb, jogo["gols_real_a"], jogo["gols_real_b"])
+            pontuacao[nome_formatado] += calcular_pontos(pga, pgb, jogo["gols_real_a"], jogo["gols_real_b"])
 
     ranking = sorted(pontuacao.items(), key=lambda x: x[1], reverse=True)
     st.subheader("🏅 Classificação dos Participantes")
     if ranking:
-        for pos, (usuario_nome, pontos) in enumerate(ranking, start=1):
-            st.write(f"**{pos}º Lugar:** {usuario_nome} — 🌟 {pontos} pontos")
+        for pos, (nome_formatado, pontos) in enumerate(ranking, start=1):
+            st.write(f"**{pos}º Lugar:** {nome_formatado} — 🌟 {pontos} pontos")
     else:
         st.info("Nenhum palpite registrado ainda.")
 
@@ -824,6 +826,7 @@ with aba_ranking:
     st.write("📋 **Palpites válidos para o ranking**")
     if todos_palpites:
         for usuario_nome, jogo_id, pga, pgb, dt_reg in todos_palpites:
+            nome_formatado = usuario_nome.title() # 2. Aplica o .title() na lista de palpites
             jogo = mapa_jogos.get(jogo_id)
             if jogo:
                 nome_a = nome_time_ptbr(jogo["time_a"])
@@ -834,15 +837,16 @@ with aba_ranking:
                 
                 # O usuário sempre vê o próprio palpite. O de terceiros fica oculto se o jogo não iniciou.
                 if jogo_bloqueado or usuario_nome.lower() == usuario.lower():
-                    st.caption(f"⏱️ {usuario_nome} → {pga}x{pgb} ({nome_a} x {nome_b}) em: {dt_reg}")
+                    st.caption(f"⏱️ {nome_formatado} → {pga}x{pgb} ({nome_a} x {nome_b}) em: {dt_reg}")
                 else:
-                    st.caption(f"⏱️ {usuario_nome} → 🔒 Oculto ({nome_a} x {nome_b})")
+                    st.caption(f"⏱️ {nome_formatado} → 🔒 Oculto ({nome_a} x {nome_b})")
 
     st.markdown("---")
     st.write("🕘 **Histórico de alterações**")
     historico = carregar_historico(limit=500)
     if historico:
         for usuario_nome, jogo_id, pga, pgb, dt_reg in historico:
+            nome_formatado = usuario_nome.title() # 3. Aplica o .title() no histórico
             jogo = mapa_jogos.get(jogo_id)
             if jogo:
                 nome_a = nome_time_ptbr(jogo["time_a"])
@@ -851,8 +855,8 @@ with aba_ranking:
                 jogo_bloqueado = jogo["status"] == "FT" or agora >= jogo["data_jogo"]
                 
                 if jogo_bloqueado or usuario_nome.lower() == usuario.lower():
-                    st.caption(f"{dt_reg} • {usuario_nome} alterou para {pga}x{pgb} em {nome_a} x {nome_b}")
+                    st.caption(f"{dt_reg} • {nome_formatado} alterou para {pga}x{pgb} em {nome_a} x {nome_b}")
                 else:
-                    st.caption(f"{dt_reg} • {usuario_nome} atualizou o palpite em {nome_a} x {nome_b} (🔒 Oculto)")
+                    st.caption(f"{dt_reg} • {nome_formatado} atualizou o palpite em {nome_a} x {nome_b} (🔒 Oculto)")
     else:
         st.info("Nenhuma alteração registrada ainda.")
