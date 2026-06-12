@@ -617,7 +617,6 @@ else:
     st.caption(" | ".join(mensagens_sync))
 
 usuario = st.text_input("👤 Usuário:", placeholder="Digite seu nome para registrar os palpites...").strip()
-usuario = st.text_input("Digite seu nome:", placeholder="Seu nome").strip()
 autorizado = usuario_autorizado(usuario) if usuario else False
 
 if not usuario:
