@@ -137,6 +137,7 @@ TEAM_TO_PTBR = {
     "ireland": "Irlanda",
     "italy": "Itália",
     "japan": "Japão",
+}
 
 @st.cache_data(ttl=300, show_spinner=False)
 def buscar_odds_native_stats():
