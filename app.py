@@ -65,6 +65,22 @@ TEAM_ALIASES = {
     "southafrica": "southafrica",
     "newzealand": "newzealand",
     "costarica": "costarica",
+    "ivorycoast": "ivorycoast",
+    "cotedivoire": "ivorycoast",
+    "capeverde": "capeverde",
+    "caboverde": "capeverde",
+    "algeria": "algeria",
+    "jordania": "jordan",
+    "jordan": "jordan",
+    "uzbekistan": "uzbekistan",
+    "usbequistao": "uzbekistan",
+    "panama": "panama",
+    "congo": "congo",
+    "republicofthecongo": "congo",
+    "congorepublic": "congo",
+    "drcongo": "drcongo",
+    "democraticrepublicofthecongo": "drcongo",
+    "rdcongo": "drcongo",
 }
 
 TEAM_META = {
@@ -122,6 +138,17 @@ TEAM_META = {
     "uruguay": {"flag": "🇺🇾", "ptbr": "Uruguai"},
     "wales": {"flag": "🇬🇧", "ptbr": "País de Gales"},
     "tunisia": {"flag": "🇹🇳", "ptbr": "Tunísia"},
+    "algeria": {"flag": "🇩🇿", "ptbr": "Argélia"},
+    "capeverde": {"flag": "🇨🇻", "ptbr": "Cabo Verde"},
+    "ivorycoast": {"flag": "🇨🇮", "ptbr": "Costa do Marfim"},
+    "cotedivoire": {"flag": "🇨🇮", "ptbr": "Costa do Marfim"},
+    "jordan": {"flag": "🇯🇴", "ptbr": "Jordânia"},
+    "uzbekistan": {"flag": "🇺🇿", "ptbr": "Usbequistão"},
+    "congo": {"flag": "🇨🇬", "ptbr": "Congo"},
+    "drcongo": {"flag": "🇨🇩", "ptbr": "República Democrática do Congo"},
+    "democraticrepublicofthecongo": {"flag": "🇨🇩", "ptbr": "República Democrática do Congo"},
+    "panama": {"flag": "🇵🇦", "ptbr": "Panamá"},
+
 }
 
 
