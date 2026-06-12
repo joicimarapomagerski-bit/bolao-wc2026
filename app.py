@@ -27,7 +27,7 @@ WHITELIST_NOMES = [
     "joici",
     "gui",
     "dudu",
-    'isa",
+    "isa",
     # adicione mais nomes aqui
 ]
 
