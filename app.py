@@ -102,8 +102,7 @@ TEAM_META = {
     "denmark": {"flag": "🇩🇰", "ptbr": "Dinamarca"},
     "ecuador": {"flag": "🇪🇨", "ptbr": "Equador"},
     "egypt": {"flag": "🇪🇬", "ptbr": "Egito"},
-    # usando bandeira do Reino Unido para compatibilidade máxima
-    "england": {"flag": "🇬🇧", "ptbr": "Inglaterra"},
+    "england": {"flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "ptbr": "Inglaterra"},
     "france": {"flag": "🇫🇷", "ptbr": "França"},
     "germany": {"flag": "🇩🇪", "ptbr": "Alemanha"},
     "ghana": {"flag": "🇬🇭", "ptbr": "Gana"},
@@ -127,7 +126,7 @@ TEAM_META = {
     "qatar": {"flag": "🇶🇦", "ptbr": "Catar"},
     "romania": {"flag": "🇷🇴", "ptbr": "Romênia"},
     "saudiarabia": {"flag": "🇸🇦", "ptbr": "Arábia Saudita"},
-    "scotland": {"flag": "🇬🇧", "ptbr": "Escócia"},
+    "scotland": {"flag": "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "ptbr": "Escócia"},
     "senegal": {"flag": "🇸🇳", "ptbr": "Senegal"},
     "serbia": {"flag": "🇷🇸", "ptbr": "Sérvia"},
     "southafrica": {"flag": "🇿🇦", "ptbr": "África do Sul"},
@@ -137,7 +136,7 @@ TEAM_META = {
     "turkey": {"flag": "🇹🇷", "ptbr": "Turquia"},
     "unitedstates": {"flag": "🇺🇸", "ptbr": "Estados Unidos"},
     "uruguay": {"flag": "🇺🇾", "ptbr": "Uruguai"},
-    "wales": {"flag": "🇬🇧", "ptbr": "País de Gales"},
+    "wales": {"flag": "🏴󠁧󠁢󠁷󠁬󠁳󠁿", "ptbr": "País de Gales"},
     "tunisia": {"flag": "🇹🇳", "ptbr": "Tunísia"},
     "algeria": {"flag": "🇩🇿", "ptbr": "Argélia"},
     "capeverde": {"flag": "🇨🇻", "ptbr": "Cabo Verde"},
@@ -147,9 +146,8 @@ TEAM_META = {
     "uzbekistan": {"flag": "🇺🇿", "ptbr": "Usbequistão"},
     "congo": {"flag": "🇨🇬", "ptbr": "Congo"},
     "drcongo": {"flag": "🇨🇩", "ptbr": "República Democrática do Congo"},
-    "democraticrepublicofthecongo": {"flag": "🇨🇩", "ptbr": "República Democrática do Congo"},
+    "democraticrepublicofthecongo": {"flag": "🇨🇬", "ptbr": "República Democrática do Congo"},
     "panama": {"flag": "🇵🇦", "ptbr": "Panamá"},
-
 }
 
 
@@ -588,6 +586,23 @@ def carregar_historico(limit=300):
 
 
 st.set_page_config(page_title="Bolão Copa 2026", layout="centered")
+
+# --- INJEÇÃO DE CSS PARA RESOLVER O PROBLEMA DAS BANDEIRAS NO WINDOWS ---
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&display=swap');
+    
+    body, div, span, p, a, h1, h2, h3, h4, h5, h6 {
+        font-family: "Source Sans Pro", sans-serif, "Noto Color Emoji" !important;
+    }
+    
+    /* EXCEÇÃO: Protege os ícones internos do Streamlit (como a setinha do expander) */
+    .material-symbols-rounded, [data-testid="stIconMaterial"] {
+        font-family: "Material Symbols Rounded", sans-serif !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 inicializar_banco()
 
 if AUTOREFRESH_OK:
@@ -622,14 +637,21 @@ with col2:
     st.caption("Atualização automática a cada 60 segundos.")
 
 jogos_copa = carregar_jogos_do_banco()
-aba_palpites, aba_ranking = st.tabs(["🔮 Agenda & Palpites", "📊 Ranking Geral"])
+
+# Separa os jogos baseados no status "FT" (Full Time / Finalizado)
+jogos_ativos = [j for j in jogos_copa if j["status"] != "FT"]
+jogos_finalizados = [j for j in jogos_copa if j["status"] == "FT"]
+
+# Adiciona a nova aba no Streamlit
+aba_palpites, aba_finalizados, aba_ranking = st.tabs(["🔮 Agenda & Palpites", "📁 Jogos Finalizados", "📊 Ranking Geral"])
 
 with aba_palpites:
-    if not jogos_copa:
-        st.info("Nenhum jogo disponível ainda.")
+    if not jogos_ativos:
+        st.info("Nenhum jogo pendente na agenda.")
 
     agora = datetime.now(FUSO_BR)
-    for jogo in jogos_copa:
+    
+    for jogo in jogos_ativos:
         foi_bloqueado = jogo["status"] == "FT" or agora >= jogo["data_jogo"]
         pode_palpitar = autorizado and not foi_bloqueado
         palpite_salvo_a, palpite_salvo_b = buscar_palpite_usuario(usuario, jogo["id"])
@@ -639,66 +661,88 @@ with aba_palpites:
         nome_a = nome_time_ptbr(jogo["time_a"])
         nome_b = nome_time_ptbr(jogo["time_b"])
 
+        # Cria um "card" com borda para cada jogo da lista
+        with st.container(border=True):
+            
+            # Estrutura a linha principal
+            c_time_a, c_gols_a, c_x, c_gols_b, c_time_b, c_btn = st.columns([3, 1, 0.5, 1, 3, 2])
+            
+            with c_time_a:
+                st.markdown(f"<div style='text-align: right; margin-top: 5px;'><b>{nome_a}</b> {flag_a}</div>", unsafe_allow_html=True)
+            
+            with c_gols_a:
+                gols_a = st.number_input(
+                    f"GA_{jogo['id']}", min_value=0, max_value=20, value=int(palpite_salvo_a),
+                    key=f"ga_{jogo['id']}", disabled=not pode_palpitar, label_visibility="collapsed"
+                )
+            
+            with c_x:
+                st.markdown("<div style='text-align: center; color: gray; margin-top: 5px;'>x</div>", unsafe_allow_html=True)
+
+            with c_gols_b:
+                gols_b = st.number_input(
+                    f"GB_{jogo['id']}", min_value=0, max_value=20, value=int(palpite_salvo_b),
+                    key=f"gb_{jogo['id']}", disabled=not pode_palpitar, label_visibility="collapsed"
+                )
+                
+            with c_time_b:
+                st.markdown(f"<div style='text-align: left; margin-top: 5px;'>{flag_b} <b>{nome_b}</b></div>", unsafe_allow_html=True)
+            
+            with c_btn:
+                if pode_palpitar:
+                    if st.button("Salvar", key=f"btn_{jogo['id']}", use_container_width=True):
+                        horario = salvar_palpite(usuario, jogo["id"], gols_a, gols_b)
+                        st.toast(f"Palpite salvo às {horario[-8:]}!") 
+                        st.rerun()
+                else:
+                    st.markdown("<div style='text-align: center; color: gray; font-size: 14px; margin-top: 5px;'>🔒 Fechado</div>", unsafe_allow_html=True)
+
+            # Esconde as Odds e data dentro de uma sanfona (expander)
+            with st.expander(f"📅 {jogo['data_jogo'].strftime('%d/%m/%Y %H:%M')} | 📊 Ver Odds"):
+                if jogo["odd_time_a"] is not None and jogo["odd_empate"] is not None and jogo["odd_time_b"] is not None:
+                    favorito_nome, odd_favorito = determinar_favorito(nome_a, nome_b, jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"])
+                    probs = calcular_probabilidades_implicitas(jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"])
+
+                    st.markdown(badge_favorito_markdown(favorito_nome, odd_favorito), unsafe_allow_html=True)
+                    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
+                    c_odd1, c_oddx, c_odd2 = st.columns(3)
+                    with c_odd1:
+                        st.metric(label=f"{flag_a} {nome_a}", value=f"{float(jogo['odd_time_a']):.2f}", delta=f"{probs['a']:.1f}%" if probs else None)
+                    with c_oddx:
+                        st.metric(label="🤝 Empate", value=f"{float(jogo['odd_empate']):.2f}", delta=f"{probs['e']:.1f}%" if probs else None)
+                    with c_odd2:
+                        st.metric(label=f"{flag_b} {nome_b}", value=f"{float(jogo['odd_time_b']):.2f}", delta=f"{probs['b']:.1f}%" if probs else None)
+
+                    if jogo.get("odds_atualizadas_em"):
+                        try:
+                            dt_odds = datetime.fromisoformat(jogo["odds_atualizadas_em"]).strftime('%d/%m/%Y %H:%M:%S')
+                            st.caption(f"Odds atualizadas em: {dt_odds} | Fonte: {jogo.get('fonte_odds', 'N/D')}")
+                        except Exception:
+                            st.caption(f"Fonte: {jogo.get('fonte_odds', 'N/D')}")
+                else:
+                    st.caption("Odds indisponíveis no momento.")
+
+# --- NOVA ABA DE JOGOS FINALIZADOS ---
+with aba_finalizados:
+    if not jogos_finalizados:
+        st.info("Nenhum jogo finalizado ainda.")
+
+    for jogo in jogos_finalizados:
+        flag_a = bandeira_time(jogo["time_a"])
+        flag_b = bandeira_time(jogo["time_b"])
+        nome_a = nome_time_ptbr(jogo["time_a"])
+        nome_b = nome_time_ptbr(jogo["time_b"])
+
         st.subheader(f"{flag_a} {nome_a} vs {flag_b} {nome_b}")
-        st.caption(f"Status: {jogo['status']} | Horário: {jogo['data_jogo'].strftime('%d/%m/%Y %H:%M')}")
+        st.caption(f"Encerrado | Data: {jogo['data_jogo'].strftime('%d/%m/%Y %H:%M')}")
 
-        if jogo["odd_time_a"] is not None and jogo["odd_empate"] is not None and jogo["odd_time_b"] is not None:
-            favorito_nome, odd_favorito = determinar_favorito(nome_a, nome_b, jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"])
-            probs = calcular_probabilidades_implicitas(jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"])
+        # Pega os gols reais de forma segura
+        gols_a = int(jogo["gols_real_a"]) if jogo["gols_real_a"] is not None else "-"
+        gols_b = int(jogo["gols_real_b"]) if jogo["gols_real_b"] is not None else "-"
 
-            st.markdown(badge_favorito_markdown(favorito_nome, odd_favorito), unsafe_allow_html=True)
-            st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-
-            c_odd1, c_oddx, c_odd2 = st.columns(3)
-            with c_odd1:
-                st.metric(label=f"{flag_a} {nome_a}", value=f"{float(jogo['odd_time_a']):.2f}", delta=f"{probs['a']:.1f}%" if probs else None)
-            with c_oddx:
-                st.metric(label="🤝 Empate", value=f"{float(jogo['odd_empate']):.2f}", delta=f"{probs['e']:.1f}%" if probs else None)
-            with c_odd2:
-                st.metric(label=f"{flag_b} {nome_b}", value=f"{float(jogo['odd_time_b']):.2f}", delta=f"{probs['b']:.1f}%" if probs else None)
-
-            if jogo.get("odds_atualizadas_em"):
-                try:
-                    dt_odds = datetime.fromisoformat(jogo["odds_atualizadas_em"]).strftime('%d/%m/%Y %H:%M:%S')
-                    st.caption(f"Odds atualizadas em: {dt_odds} | Fonte: {jogo.get('fonte_odds', 'N/D')}")
-                except Exception:
-                    st.caption(f"Fonte: {jogo.get('fonte_odds', 'N/D')}")
-        else:
-            st.caption("Odds indisponíveis no momento.")
-
-        if foi_bloqueado:
-            st.error("🔒 Palpites encerrados para esta partida.")
-            if jogo["gols_real_a"] is not None and jogo["gols_real_b"] is not None:
-                st.info(f"Placar oficial: {nome_a} {int(jogo['gols_real_a'])} x {int(jogo['gols_real_b'])} {nome_b}")
-        elif autorizado:
-            st.success("⏳ Palpite liberado.")
-        else:
-            st.info("Visualização liberada. Para registrar palpites, use um usuário autorizado.")
-
-        c1, _, c2 = st.columns([2, 1, 2])
-        with c1:
-            gols_a = st.number_input(
-                f"Gols {nome_a}",
-                min_value=0, max_value=20,
-                value=int(palpite_salvo_a),
-                key=f"ga_{jogo['id']}",
-                disabled=not pode_palpitar,
-            )
-        with c2:
-            gols_b = st.number_input(
-                f"Gols {nome_b}",
-                min_value=0, max_value=20,
-                value=int(palpite_salvo_b),
-                key=f"gb_{jogo['id']}",
-                disabled=not pode_palpitar,
-            )
-
-        if pode_palpitar:
-            if st.button(f"Salvar {gols_a} x {gols_b}", key=f"btn_{jogo['id']}", use_container_width=True):
-                horario = salvar_palpite(usuario, jogo["id"], gols_a, gols_b)
-                st.success(f"Palpite salvo às {horario}. O histórico de alterações foi registrado.")
-                st.rerun()
-
+        # Placar simplificado, sem input, sem odds
+        st.success(f"**Placar Oficial:** {nome_a} {gols_a} x {gols_b} {nome_b}")
         st.markdown("---")
 
 with aba_ranking:
