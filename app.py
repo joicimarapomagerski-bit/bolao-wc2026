@@ -663,7 +663,7 @@ jogos_copa = carregar_jogos_do_banco()
 jogos_ativos = [j for j in jogos_copa if j["status"] != "FT"]
 jogos_finalizados = [j for j in jogos_copa if j["status"] == "FT"]
 
-aba_palpites, aba_finalizados, aba_ranking = st.tabs(["🔮 Agenda & Palpites", "📁 Jogos Finalizados", "📊 Ranking Geral")])
+aba_palpites, aba_finalizados, aba_ranking = st.tabs(["🔮 Agenda & Palpites", "📁 Jogos Finalizados", "📊 Ranking Geral"])
 
 with aba_palpites:
     if not jogos_ativos:
