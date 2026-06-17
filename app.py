@@ -153,7 +153,7 @@ TEAM_META = {
     "cotedivoire": {"flag": "🇨🇮", "ptbr": "Costa do Marfim"},
     "jordan": {"flag": "🇯🇴", "ptbr": "Jordânia"},
     "uzbekistan": {"flag": "🇺🇿", "ptbr": "Usbequistão"},
-    "congodr": {"flag": "🇨🇬", "ptbr": "Congo"},
+    "congodr": {"flag": "🇨🇩", "ptbr": "Congo"},
     "drcongo": {"flag": "🇨🇩", "ptbr": "República Democrática do Congo"},
     "democraticrepublicofthecongo": {"flag": "🇨🇩", "ptbr": "República Democrática do Congo"},
     "panama": {"flag": "🇵🇦", "ptbr": "Panamá"},
