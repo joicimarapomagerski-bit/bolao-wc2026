@@ -29,6 +29,13 @@ WHITELIST_NOMES = [
     "Alan",
     "Fabio",
     "Gama",
+    "Fer",
+    "Cabral",
+    "João",
+    "Joãozinho",
+    "Munhoz",
+    "Moises",
+    "Vanderley",
     # adicione mais nomes aqui
 ]
 
