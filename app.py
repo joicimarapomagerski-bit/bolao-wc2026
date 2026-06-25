@@ -340,6 +340,7 @@ def buscar_jogos_api():
 
     jogos = []
     for item in dados.get("matches", []):
+        # TRAVA RESTAURADA: Só carrega os jogos da fase de grupos para evitar erro
         if item.get("stage") != "GROUP_STAGE":
             continue
 
@@ -667,6 +668,7 @@ else:
 
 jogos_copa = carregar_jogos_do_banco()
 
+# --- MANTEVE O CÓDIGO ORIGINAL (Sem edição oculta de admin)
 jogos_ativos = [j for j in jogos_copa if j["status"] != "FT"]
 jogos_finalizados = [j for j in jogos_copa if j["status"] == "FT"]
 
@@ -720,7 +722,6 @@ with aba_palpites:
                         st.toast(f"Palpite salvo às {horario[-8:]}!") 
                         st.rerun()
                     
-                    # Mostra o placar que está salvo oficialmente embaixo do botão
                     if ja_palpitou:
                         st.markdown(f"<div style='text-align: center; color: #10b981; font-size: 12px; margin-top: -12px;'>✅ <b>{palpite_salvo_a} x {palpite_salvo_b}</b></div>", unsafe_allow_html=True)
                 else:
@@ -764,10 +765,8 @@ with aba_finalizados:
         nome_a = nome_time_ptbr(jogo["time_a"])
         nome_b = nome_time_ptbr(jogo["time_b"])
 
-        # Busca o palpite do usuário para calcular a pontuação
         pga, pgb, ja_palpitou = buscar_palpite_usuario(usuario, jogo["id"])
 
-        # Pega os gols reais de forma segura e converte para texto
         gols_real_a = jogo["gols_real_a"]
         gols_real_b = jogo["gols_real_b"]
         str_gols_a = str(int(gols_real_a)) if gols_real_a is not None else "-"
@@ -799,7 +798,7 @@ with aba_finalizados:
             
             if ja_palpitou and gols_real_a is not None and gols_real_b is not None:
                 pontos = calcular_pontos(pga, pgb, gols_real_a, gols_real_b)
-                cor_pontos = "#10b981" if pontos > 0 else "#ef4444" # Verde se pontuou, Vermelho se errou tudo
+                cor_pontos = "#10b981" if pontos > 0 else "#ef4444" 
                 texto_pontos = f"+{pontos} pontos" if pontos > 0 else "0 pontos"
                 st.markdown(f"<div style='text-align: center; font-size: 14px;'>Seu palpite foi: <b>{pga} x {pgb}</b> &nbsp;•&nbsp; <span style='color: {cor_pontos}; font-weight: bold;'>{texto_pontos}</span></div>", unsafe_allow_html=True)
             elif ja_palpitou:
@@ -808,7 +807,7 @@ with aba_finalizados:
                 st.markdown("<div style='text-align: center; font-size: 14px; color: gray;'><i>Você não palpitou neste jogo.</i></div>", unsafe_allow_html=True)
 
 with aba_ranking:
-    agora = datetime.now(FUSO_BR) # Necessário para checar se o jogo já começou
+    agora = datetime.now(FUSO_BR) 
     conn = conectar()
     cur = conn.cursor()
     cur.execute("SELECT usuario, jogo_id, gols_time_a, gols_time_b, data_registro FROM palpites_placar")
@@ -816,20 +815,52 @@ with aba_ranking:
     conn.close()
 
     pontuacao = {}
+    detalhes_pontos = {}
     mapa_jogos = {j["id"]: j for j in jogos_copa}
 
     for usuario_nome, jogo_id, pga, pgb, _ in todos_palpites:
         nome_formatado = usuario_nome.title() 
         pontuacao.setdefault(nome_formatado, 0)
+        detalhes_pontos.setdefault(nome_formatado, [])
+        
         jogo = mapa_jogos.get(jogo_id)
         if jogo:
-            pontuacao[nome_formatado] += calcular_pontos(pga, pgb, jogo["gols_real_a"], jogo["gols_real_b"])
+            pts = calcular_pontos(pga, pgb, jogo["gols_real_a"], jogo["gols_real_b"])
+            pontuacao[nome_formatado] += pts
+            
+            # Guarda os detalhes da pontuação para exibir depois
+            if pts > 0:
+                detalhes_pontos[nome_formatado].append({
+                    "jogo": jogo,
+                    "pga": pga,
+                    "pgb": pgb,
+                    "pontos": pts
+                })
 
     ranking = sorted(pontuacao.items(), key=lambda x: x[1], reverse=True)
     st.subheader("🏅 Classificação dos Participantes")
     if ranking:
-        for pos, (nome_formatado, pontos) in enumerate(ranking, start=1):
-            st.write(f"**{pos}º Lugar:** {nome_formatado} — 🌟 {pontos} pontos")
+        for pos, (nome_formatado, pontos_totais) in enumerate(ranking, start=1):
+            with st.expander(f"**{pos}º Lugar:** {nome_formatado} — 🌟 {pontos_totais} pontos"):
+                pontuacoes_usuario = detalhes_pontos.get(nome_formatado, [])
+                if pontuacoes_usuario:
+                    # Ordena para mostrar os jogos mais recentes em que pontuou primeiro
+                    pontuacoes_usuario.sort(key=lambda x: x["jogo"]["data_jogo"], reverse=True)
+                    for det in pontuacoes_usuario:
+                        j = det["jogo"]
+                        nome_a = nome_time_ptbr(j["time_a"])
+                        nome_b = nome_time_ptbr(j["time_b"])
+                        flag_a = bandeira_time(j["time_a"])
+                        flag_b = bandeira_time(j["time_b"])
+                        gr_a = int(j["gols_real_a"])
+                        gr_b = int(j["gols_real_b"])
+                        pga_det = det["pga"]
+                        pgb_det = det["pgb"]
+                        pts_det = det["pontos"]
+                        
+                        st.markdown(f"**+{pts_det} pts** | {flag_a} {nome_a} **{gr_a} x {gr_b}** {nome_b} {flag_b} *(Palpite: {pga_det} x {pgb_det})*")
+                else:
+                    st.write("Ainda não pontuou em nenhuma partida encerrada.")
     else:
         st.info("Nenhum palpite registrado ainda.")
 
@@ -855,18 +886,17 @@ with aba_ranking:
                     for usuario_nome, pga, pgb, dt_reg in palpites_por_jogo[jogo["id"]]:
                         nome_formatado = usuario_nome.title()
                         
-                        # O usuário sempre vê o próprio palpite. O de terceiros fica oculto se o jogo não iniciou.
                         if jogo_bloqueado or usuario_nome.lower() == usuario:
                             st.markdown(f"**{nome_formatado}** ➔ {pga} x {pgb} &nbsp;&nbsp;<span style='color:gray; font-size:12px;'>⏱️ {dt_reg}</span>", unsafe_allow_html=True)
                         else:
-                            st.markdown(f"**{nome_formatado}** ➔ 🔒", unsafe_allow_html=True)
+                            st.markdown(f"**{nome_formatado}** ➔ 🔒 Oculto", unsafe_allow_html=True)
 
     st.markdown("---")
     st.write("🕘 **Histórico de alterações**")
     historico = carregar_historico(limit=500)
     if historico:
         for usuario_nome, jogo_id, pga, pgb, dt_reg in historico:
-            nome_formatado = usuario_nome.title() # 3. Aplica o .title() no histórico
+            nome_formatado = usuario_nome.title() 
             jogo = mapa_jogos.get(jogo_id)
             if jogo:
                 nome_a = nome_time_ptbr(jogo["time_a"])
@@ -877,7 +907,7 @@ with aba_ranking:
                 if jogo_bloqueado or usuario_nome.lower() == usuario:
                     st.caption(f"{dt_reg} • {nome_formatado} alterou para {pga}x{pgb} em {nome_a} x {nome_b}")
                 else:
-                    st.caption(f"{dt_reg} • {nome_formatado} atualizou o palpite em {nome_a} x {nome_b} (🔒)")
+                    st.caption(f"{dt_reg} • {nome_formatado} atualizou o palpite em {nome_a} x {nome_b} (🔒 Oculto)")
     else:
         st.info("Nenhuma alteração registrada ainda.")
 
@@ -894,4 +924,3 @@ with aba_ranking:
 #        * *Exemplo:* O jogo terminou 1x0. Você palpitou 3x0 ou 2x1.
 #    * **0 Pontos:** Você errou o resultado da partida (ex: apostou na vitória do Time A, mas deu empate ou Time B).
 #    """)
-
