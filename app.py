@@ -215,7 +215,7 @@ def inicializar_banco():
 
     adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odd_time_a REAL")
     adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odd_empate REAL")
-    adicionar_coluna_se_nao_existir(cur, "odd_time_b REAL")
+    adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odd_time_b REAL")
     adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odds_atualizadas_em TEXT")
     adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "fonte_odds TEXT")
 
@@ -894,3 +894,4 @@ with aba_ranking:
 #        * *Exemplo:* O jogo terminou 1x0. Você palpitou 3x0 ou 2x1.
 #    * **0 Pontos:** Você errou o resultado da partida (ex: apostou na vitória do Time A, mas deu empate ou Time B).
 #    """)
+
