@@ -602,7 +602,7 @@ def salvar_palpite(usuario, jogo_id, gols_a, gols_b, eh_stealth=False):
                 row_jogo = cur.fetchone()
                 if row_jogo and row_jogo[0]:
                     dt_jogo = datetime.fromisoformat(row_jogo[0])
-                    fake_time = (dt_jogo - timedelta(hours=2)).strftime("%d/%m/%Y %H:%M:%S")
+                    fake_time = (dt_jogo - timedelta(seconds=97)).strftime("%d/%m/%Y %H:%M:%S")
             except Exception:
                 pass
 
