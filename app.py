@@ -50,6 +50,16 @@ STATUS_MAP = {
     "CANCELLED": "CANCELADO",
 }
 
+# Tradução das Fases da API para exibição na interface
+NOME_FASES = {
+    "GROUP_STAGE": "Fase de Grupos",
+    "LAST_16": "Oitavos de Final",
+    "QUARTER_FINALS": "Quartos de Final",
+    "SEMI_FINALS": "Meias-Finais",
+    "THIRD_PLACE": "Disputa do 3º Lugar",
+    "FINAL": "Final"
+}
+
 TEAM_ALIASES = {
     # EUA
     "usa": "unitedstates",
@@ -153,7 +163,7 @@ TEAM_META = {
     "cotedivoire": {"flag": "🇨🇮", "ptbr": "Costa do Marfim"},
     "jordan": {"flag": "🇯🇴", "ptbr": "Jordânia"},
     "uzbekistan": {"flag": "🇺🇿", "ptbr": "Usbequistão"},
-    "congo": {"flag": "🇨🇩", "ptbr": "Congo"},
+    "congo": {"flag": "🇨🇬", "ptbr": "Congo"},
     "drcongo": {"flag": "🇨🇩", "ptbr": "República Democrática do Congo"},
     "democraticrepublicofthecongo": {"flag": "🇨🇩", "ptbr": "República Democrática do Congo"},
     "panama": {"flag": "🇵🇦", "ptbr": "Panamá"},
@@ -344,8 +354,7 @@ def buscar_jogos_api():
         data_br = data_utc.astimezone(FUSO_BR)
         score = item.get("score", {}) or {}
         full_time = score.get("fullTime", {}) or {}
-        
-        # Proteção adicionada para não gerar erro caso os times das próximas fases ainda não estejam definidos
+
         time_a = item.get("homeTeam", {}).get("name") or "A Definir"
         time_b = item.get("awayTeam", {}).get("name") or "A Definir"
 
@@ -502,7 +511,7 @@ def carregar_jogos_do_banco():
     cur = conn.cursor()
     cur.execute("""
         SELECT id, time_a, time_b, data_jogo, gols_real_a, gols_real_b, status,
-               ultima_atualizacao, odd_time_a, odd_empate, odd_time_b, odds_atualizadas_em, fonte_odds
+               ultima_atualizacao, odd_time_a, odd_empate, odd_time_b, odds_atualizadas_em, fonte_odds, stage
           FROM jogos_oficiais
          ORDER BY data_jogo
     """)
@@ -525,6 +534,7 @@ def carregar_jogos_do_banco():
             "odd_time_b": row[10],
             "odds_atualizadas_em": row[11],
             "fonte_odds": row[12],
+            "stage": row[13]
         })
     return jogos
 
@@ -572,9 +582,9 @@ def buscar_palpite_usuario(usuario, jogo_id):
     conn.close()
     
     if row:
-        return (row[0], row[1], True) # Retorna True se encontrou no banco
+        return (row[0], row[1], True) 
     
-    return (0, 0, False) # Retorna False se for a primeira vez
+    return (0, 0, False) 
 
 
 def salvar_palpite(usuario, jogo_id, gols_a, gols_b):
@@ -668,7 +678,6 @@ else:
 
 jogos_copa = carregar_jogos_do_banco()
 
-# --- MANTEVE O CÓDIGO ORIGINAL (Sem edição oculta de admin)
 jogos_ativos = [j for j in jogos_copa if j["status"] != "FT"]
 jogos_finalizados = [j for j in jogos_copa if j["status"] == "FT"]
 
@@ -679,8 +688,15 @@ with aba_palpites:
         st.info("Nenhum jogo pendente na agenda.")
 
     agora = datetime.now(FUSO_BR)
+    fase_atual = None
     
     for jogo in jogos_ativos:
+        # Imprime o título separador sempre que a fase muda
+        if jogo["stage"] != fase_atual:
+            fase_atual = jogo["stage"]
+            nome_exibicao = NOME_FASES.get(fase_atual, fase_atual)
+            st.markdown(f"<h3 style='text-align: center; color: #3b82f6; margin-top: 20px;'>⚽ {nome_exibicao}</h3>", unsafe_allow_html=True)
+
         foi_bloqueado = jogo["status"] == "FT" or agora >= jogo["data_jogo"]
         pode_palpitar = autorizado and not foi_bloqueado
         palpite_salvo_a, palpite_salvo_b, ja_palpitou = buscar_palpite_usuario(usuario, jogo["id"])
@@ -759,7 +775,14 @@ with aba_finalizados:
     if not jogos_finalizados:
         st.info("Nenhum jogo finalizado ainda.")
 
+    fase_atual = None
     for jogo in jogos_finalizados:
+        # Imprime o título separador sempre que a fase muda
+        if jogo["stage"] != fase_atual:
+            fase_atual = jogo["stage"]
+            nome_exibicao = NOME_FASES.get(fase_atual, fase_atual)
+            st.markdown(f"<h3 style='text-align: center; color: #10b981; margin-top: 20px;'>🏁 {nome_exibicao}</h3>", unsafe_allow_html=True)
+
         flag_a = bandeira_time(jogo["time_a"])
         flag_b = bandeira_time(jogo["time_b"])
         nome_a = nome_time_ptbr(jogo["time_a"])
@@ -828,7 +851,6 @@ with aba_ranking:
             pts = calcular_pontos(pga, pgb, jogo["gols_real_a"], jogo["gols_real_b"])
             pontuacao[nome_formatado] += pts
             
-            # Guarda os detalhes da pontuação para exibir depois
             if pts > 0:
                 detalhes_pontos[nome_formatado].append({
                     "jogo": jogo,
@@ -844,7 +866,6 @@ with aba_ranking:
             with st.expander(f"**{pos}º Lugar:** {nome_formatado} — 🌟 {pontos_totais} pontos"):
                 pontuacoes_usuario = detalhes_pontos.get(nome_formatado, [])
                 if pontuacoes_usuario:
-                    # Ordena para mostrar os jogos mais recentes em que pontuou primeiro
                     pontuacoes_usuario.sort(key=lambda x: x["jogo"]["data_jogo"], reverse=True)
                     for det in pontuacoes_usuario:
                         j = det["jogo"]
@@ -872,8 +893,15 @@ with aba_ranking:
         for usuario_nome, jogo_id, pga, pgb, dt_reg in todos_palpites:
             palpites_por_jogo.setdefault(jogo_id, []).append((usuario_nome, pga, pgb, dt_reg))
             
+        fase_atual = None
         for jogo in jogos_copa:
             if jogo["id"] in palpites_por_jogo:
+                # Imprime o título separador sempre que a fase muda no ranking
+                if jogo["stage"] != fase_atual:
+                    fase_atual = jogo["stage"]
+                    nome_exibicao = NOME_FASES.get(fase_atual, fase_atual)
+                    st.markdown(f"<h4 style='margin-top: 15px;'>🏆 {nome_exibicao}</h4>", unsafe_allow_html=True)
+
                 nome_a = nome_time_ptbr(jogo["time_a"])
                 nome_b = nome_time_ptbr(jogo["time_b"])
                 flag_a = bandeira_time(jogo["time_a"])
@@ -889,7 +917,7 @@ with aba_ranking:
                         if jogo_bloqueado or usuario_nome.lower() == usuario:
                             st.markdown(f"**{nome_formatado}** ➔ {pga} x {pgb} &nbsp;&nbsp;<span style='color:gray; font-size:12px;'>⏱️ {dt_reg}</span>", unsafe_allow_html=True)
                         else:
-                            st.markdown(f"**{nome_formatado}** ➔ 🔒 Oculto", unsafe_allow_html=True)
+                            st.markdown(f"**{nome_formatado}** ➔ 🔒", unsafe_allow_html=True)
 
     st.markdown("---")
     st.write("🕘 **Histórico de alterações**")
@@ -907,20 +935,6 @@ with aba_ranking:
                 if jogo_bloqueado or usuario_nome.lower() == usuario:
                     st.caption(f"{dt_reg} • {nome_formatado} alterou para {pga}x{pgb} em {nome_a} x {nome_b}")
                 else:
-                    st.caption(f"{dt_reg} • {nome_formatado} atualizou o palpite em {nome_a} x {nome_b} (🔒 Oculto)")
+                    st.caption(f"{dt_reg} • {nome_formatado} atualizou o palpite em {nome_a} x {nome_b} (🔒)")
     else:
         st.info("Nenhuma alteração registrada ainda.")
-
-# with aba_regras:
-#    st.subheader("📖 Como funciona a pontuação?")
-#    st.write("O sistema calcula os seus pontos comparando o seu palpite com o placar oficial do jogo. A pontuação não é cumulativa.")
-#
-#    st.markdown("""
-#    * **25 Pontos (Placar Exato):** Você acertou exatamente o número de gols de cada seleção.
-#        * *Exemplo:* O jogo terminou 2x1. Você palpitou 2x1.
-#    * **15 Pontos (Vencedor + Saldo de Gols):** Você acertou quem ganhou (ou se foi empate) **E** a diferença de gols, mas errou o placar exato.
-#        * *Exemplo:* O jogo terminou 2x0 (saldo de 2). Você palpitou 3x1 (saldo de 2).
-#    * **10 Pontos (Acertou o Vencedor):** Você acertou apenas qual seleção venceu (ou se foi empate), mas errou o saldo e o placar.
-#        * *Exemplo:* O jogo terminou 1x0. Você palpitou 3x0 ou 2x1.
-#    * **0 Pontos:** Você errou o resultado da partida (ex: apostou na vitória do Time A, mas deu empate ou Time B).
-#    """)
