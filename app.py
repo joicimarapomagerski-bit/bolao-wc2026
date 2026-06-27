@@ -939,4 +939,3 @@ with aba_ranking:
     else:
         st.info("Nenhuma alteração registrada ainda.")
 
-with aba_regras:
