@@ -889,7 +889,7 @@ with aba_ranking:
                         if jogo_bloqueado or usuario_nome.lower() == usuario:
                             st.markdown(f"**{nome_formatado}** ➔ {pga} x {pgb} &nbsp;&nbsp;<span style='color:gray; font-size:12px;'>⏱️ {dt_reg}</span>", unsafe_allow_html=True)
                         else:
-                            st.markdown(f"**{nome_formatado}** ➔ 🔒 Oculto", unsafe_allow_html=True)
+                            st.markdown(f"**{nome_formatado}** ➔ 🔒", unsafe_allow_html=True)
 
     st.markdown("---")
     st.write("🕘 **Histórico de alterações**")
@@ -907,7 +907,7 @@ with aba_ranking:
                 if jogo_bloqueado or usuario_nome.lower() == usuario:
                     st.caption(f"{dt_reg} • {nome_formatado} alterou para {pga}x{pgb} em {nome_a} x {nome_b}")
                 else:
-                    st.caption(f"{dt_reg} • {nome_formatado} atualizou o palpite em {nome_a} x {nome_b} (🔒 Oculto)")
+                    st.caption(f"{dt_reg} • {nome_formatado} atualizou o palpite em {nome_a} x {nome_b} (🔒)")
     else:
         st.info("Nenhuma alteração registrada ainda.")
 
