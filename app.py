@@ -342,10 +342,23 @@ def buscar_jogos_api():
     for item in dados.get("matches", []):
         data_utc = datetime.fromisoformat(item["utcDate"].replace("Z", "+00:00"))
         data_br = data_utc.astimezone(FUSO_BR)
-        score = item.get("score", {}) or {}
-        full_time = score.get("fullTime", {}) or {}
         
-        # Proteção adicionada para não gerar erro caso os times das próximas fases ainda não estejam definidos
+        score = item.get("score", {}) or {}
+        
+        # Pega o placar final e o placar dos pênaltis fornecidos pela API
+        full_time = score.get("fullTime", {}) or {}
+        penalties = score.get("penalties", {}) or {}
+        
+        gols_a = full_time.get("home")
+        gols_b = full_time.get("away")
+        
+        # Se houve pênaltis, desconta do placar final para manter apenas Tempo Normal + Prorrogação
+        if gols_a is not None and penalties.get("home") is not None:
+            gols_a -= penalties.get("home")
+        if gols_b is not None and penalties.get("away") is not None:
+            gols_b -= penalties.get("away")
+        
+        # Proteção para não gerar erro caso os times das próximas fases ainda não estejam definidos
         time_a = item.get("homeTeam", {}).get("name") or "A Definir"
         time_b = item.get("awayTeam", {}).get("name") or "A Definir"
 
@@ -354,8 +367,8 @@ def buscar_jogos_api():
             "time_a": time_a,
             "time_b": time_b,
             "data_jogo": data_br.isoformat(),
-            "gols_real_a": full_time.get("home"),
-            "gols_real_b": full_time.get("away"),
+            "gols_real_a": gols_a,
+            "gols_real_b": gols_b,
             "status": mapear_status(item.get("status")),
             "stage": item.get("stage"),
             "ultima_atualizacao": datetime.now(FUSO_BR).isoformat(),
