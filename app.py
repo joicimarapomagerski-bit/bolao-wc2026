@@ -345,18 +345,17 @@ def buscar_jogos_api():
         
         score = item.get("score", {}) or {}
         
-        # Pega o placar final e o placar dos pênaltis fornecidos pela API
-        full_time = score.get("fullTime", {}) or {}
-        penalties = score.get("penalties", {}) or {}
+        # Pega especificamente o placar do Tempo Regulamentar (90 min + acréscimos)
+        reg_time = score.get("regularTime")
         
-        gols_a = full_time.get("home")
-        gols_b = full_time.get("away")
-        
-        # Se houve pênaltis, desconta do placar final para manter apenas Tempo Normal + Prorrogação
-        if gols_a is not None and penalties.get("home") is not None:
-            gols_a -= penalties.get("home")
-        if gols_b is not None and penalties.get("away") is not None:
-            gols_b -= penalties.get("away")
+        if reg_time and reg_time.get("home") is not None:
+            gols_a = reg_time.get("home")
+            gols_b = reg_time.get("away")
+        else:
+            # Fallback seguro caso o jogo ainda não tenha começado
+            full_time = score.get("fullTime", {}) or {}
+            gols_a = full_time.get("home")
+            gols_b = full_time.get("away")
         
         # Proteção para não gerar erro caso os times das próximas fases ainda não estejam definidos
         time_a = item.get("homeTeam", {}).get("name") or "A Definir"
