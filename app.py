@@ -330,7 +330,6 @@ def badge_favorito_markdown(favorito, odd):
         f"</div>"
     )
 
-
 @st.cache_data(ttl=60, show_spinner=False)
 def buscar_jogos_api():
     headers = {"X-Auth-Token": API_TOKEN}
@@ -374,8 +373,7 @@ def buscar_jogos_api():
         })
 
     return sorted(jogos, key=lambda x: x["data_jogo"])
-
-
+    
 def extrair_secao_jogos(texto: str) -> str:
     inicio = texto.find("Next matches:")
     if inicio != -1:
