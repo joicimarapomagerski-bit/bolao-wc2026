@@ -649,6 +649,12 @@ if AUTOREFRESH_OK:
 
 st.title("🏆 Bolão da Copa 2026")
 
+try:
+    with open("bolao.db", "rb") as file:
+        st.download_button(label="📥 Baixar Banco de Dados (Backup)", data=file, file_name="bolao_backup.db", mime="application/octet-stream")
+except FileNotFoundError:
+    st.write("Banco de dados ainda não foi criado.")
+
 mensagens_sync = sincronizar_agenda_e_odds()
 if any("falhou" in m.lower() for m in mensagens_sync):
     st.warning(" | ".join(mensagens_sync))
