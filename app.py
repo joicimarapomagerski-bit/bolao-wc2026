@@ -649,6 +649,24 @@ if AUTOREFRESH_OK:
 
 st.title("🏆 Bolão da Copa 2026")
 
+    # --- CÓDIGO DE DIAGNÓSTICO TEMPORÁRIO ---
+with st.expander("🛠️ Diagnóstico do Banco de Dados"):
+    conn_diag = conectar()
+    cur_diag = conn_diag.cursor()
+        
+    cur_diag.execute("SELECT COUNT(*) FROM palpites_placar")
+    qtd_palpites = cur_diag.fetchone()[0]
+        
+    cur_diag.execute("SELECT COUNT(*) FROM jogos_oficiais")
+    qtd_jogos = cur_diag.fetchone()[0]
+        
+    st.write(f"**Total de palpites salvos no arquivo .db atual:** {qtd_palpites}")
+    st.write(f"**Total de jogos oficiais salvos no arquivo .db atual:** {qtd_jogos}")
+        
+    conn_diag.close()
+    # ---------------------------------------
+
+
 mensagens_sync = sincronizar_agenda_e_odds()
 if any("falhou" in m.lower() for m in mensagens_sync):
     st.warning(" | ".join(mensagens_sync))
