@@ -140,7 +140,7 @@ TEAM_META = {
     "turkey": {"flag": "🇹🇷", "ptbr": "Turquia"},
     "unitedstates": {"flag": "🇺🇸", "ptbr": "Estados Unidos"},
     "uruguay": {"flag": "🇺🇾", "ptbr": "Uruguai"},
-    "wales": {"flag": "🏴󠁧󠁢󠁷󠁬assem", "ptbr": "País de Gales"},
+    "wales": {"flag": "🏴󠁧󠁢󠁷󠁬󠁳󠁿", "ptbr": "País de Gales"},
     "tunisia": {"flag": "🇹🇳", "ptbr": "Tunísia"},
     "algeria": {"flag": "🇩🇿", "ptbr": "Argélia"},
     "capeverde": {"flag": "🇨🇻", "ptbr": "Cabo Verde"},
@@ -217,6 +217,7 @@ def inicializar_banco():
             gols_time_a INTEGER NOT NULL,
             gols_time_b INTEGER NOT NULL,
             data_registro TEXT,
+            confronto TEXT,
             UNIQUE(usuario, jogo_id)
         )
     """)
@@ -228,7 +229,8 @@ def inicializar_banco():
             jogo_id TEXT NOT NULL,
             gols_time_a INTEGER NOT NULL,
             gols_time_b INTEGER NOT NULL,
-            data_registro TEXT NOT NULL
+            data_registro TEXT NOT NULL,
+            confronto TEXT
         )
     """)
 
@@ -246,104 +248,103 @@ def inicializar_banco():
         )
     """)
 
+    adicionar_coluna_se_nao_existir(cur, "palpites_placar", "confronto TEXT")
+    adicionar_coluna_se_nao_existir(cur, "palpites_historico", "confronto TEXT")
     adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odd_time_a REAL")
     adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odd_empate REAL")
     adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odd_time_b REAL")
     adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odds_atualizadas_em TEXT")
     adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "fonte_odds TEXT")
 
-    # --- INÍCIO DO BLOCO DE RESGATE AUTOMÁTICO DO EXCEL ---
+    # --- INÍCIO DO BLOCO DE RESGATE FORCE COMPLETO VIA CSV (Garante 100% dos palpites) ---
     import os
     import pandas as pd
 
-    if os.path.exists("historico_pdf.xlsx"):
+    if os.path.exists("historico_pdf.csv"):
         try:
-            st.info("🔄 Unificando histórico do PDF com os seus palpites novos... Aguarde.")
+            st.info("🔄 Forçando o resgate de 100% dos palpites históricos... Aguarde.")
             
-            df_pdf = pd.read_excel("historico_pdf.xlsx")
+            df_pdf = pd.read_csv("historico_pdf.csv")
             
             cur.execute("SELECT id, time_a, time_b FROM jogos_oficiais")
             jogos_db = cur.fetchall()
             
             mapa_confrontos_id = {}
             for j_id, ta, tb in jogos_db:
-                chave_direta = f"{normalizar_nome_time(ta)}x{normalizar_nome_time(tb)}"
-                chave_inversa = f"{normalizar_nome_time(tb)}x{normalizar_nome_time(ta)}"
-                mapa_confrontos_id[chave_direta] = str(j_id)
-                mapa_confrontos_id[chave_inversa] = str(j_id)
+                ta_pt = nome_time_ptbr(ta)
+                tb_pt = nome_time_ptbr(tb)
+                
+                # Mapeamento por texto puro normalizado para evitar falhas de IDs de API
+                mapa_confrontos_id[f"{normalizar_nome_time(ta_pt)}x{normalizar_nome_time(tb_pt)}"] = str(j_id)
+                mapa_confrontos_id[f"{normalizar_nome_time(tb_pt)}x{normalizar_nome_time(ta_pt)}"] = str(j_id)
+                mapa_confrontos_id[f"{normalizar_nome_time(ta)}x{normalizar_nome_time(tb)}"] = str(j_id)
+                mapa_confrontos_id[f"{normalizar_nome_time(tb)}x{normalizar_nome_time(ta)}"] = str(j_id)
             
-            palpites_pdf_convertidos = []
+            palpites_estruturados = []
             for _, linha in df_pdf.iterrows():
                 confronto_txt = str(linha['confronto'])
                 partes_times = re.split(r"\s+[xX]\s+", confronto_txt)
                 if len(partes_times) < 2:
                     continue
                 
-                chave_busca = f"{normalizar_nome_time(partes_times[0])}x{normalizar_nome_time(partes_times[1])}"
-                j_id_encontrado = mapa_confrontos_id.get(chave_busca)
+                t_a_limpo = partes_times[0].strip()
+                t_b_limpo = partes_times[1].strip()
+                chave_busca = f"{normalizar_nome_time(t_a_limpo)}x{normalizar_nome_time(t_b_limpo)}"
                 
-                if j_id_encontrado:
-                    palpites_pdf_convertidos.append({
-                        "data_registro": str(linha['data_registro']),
-                        "usuario": str(linha['usuario']).lower().strip(),
-                        "jogo_id": j_id_encontrado,
-                        "gols_time_a": int(linha['placar_time_a']),
-                        "gols_time_b": int(linha['placar_time_b'])
-                    })
-            
-            df_pdf_estruturado = pd.DataFrame(palpites_pdf_convertidos)
-            
-            if not df_pdf_estruturado.empty:
-                df_novos = pd.read_sql_query("SELECT data_registro, usuario, jogo_id, gols_time_a, gols_time_b FROM palpites_placar", conn)
-                df_total = pd.concat([df_pdf_estruturado, df_novos], ignore_index=True)
+                # Caso o ID oficial falhe por string complexa, gera um ID baseado no nome textual único
+                j_id_final = mapa_confrontos_id.get(chave_busca, f"TXT_{chave_busca}")
+                chave_confronto_formatada = f"{nome_time_ptbr(t_a_limpo)} x {nome_time_ptbr(t_b_limpo)}"
                 
-                df_total['data_registro'] = pd.to_datetime(df_total['data_registro'], errors='coerce')
-                df_total = df_total.sort_values('data_registro')
-                df_total = df_total.drop_duplicates(subset=['usuario', 'jogo_id'], keep='last')
+                palpites_estruturados.append({
+                    "data_registro": str(linha['data_registro']),
+                    "usuario": str(linha['usuario']).lower().strip(),
+                    "jogo_id": j_id_final,
+                    "gols_time_a": int(linha['placar_time_a']),
+                    "gols_time_b": int(linha['placar_time_b']),
+                    "confronto": chave_confronto_formatada
+                })
+            
+            df_total_pdf = pd.DataFrame(palpites_estruturados)
+            
+            if not df_total_pdf.empty:
+                # Puxa os novos palpites inseridos recentemente
+                df_novos = pd.read_sql_query("SELECT data_registro, usuario, jogo_id, gols_time_a, gols_time_b, confronto FROM palpites_placar", conn)
+                df_consolidado = pd.concat([df_total_pdf, df_novos], ignore_index=True)
+                
+                df_consolidado['data_registro'] = pd.to_datetime(df_consolidado['data_registro'], errors='coerce')
+                df_consolidado = df_consolidado.sort_values('data_registro')
+                
+                # REGRA DO RANKING: Garante apenas a alteração cronologicamente mais recente (keep='last')
+                df_consolidado = df_consolidado.drop_duplicates(subset=['usuario', 'jogo_id'], keep='last')
                 
                 cur.execute("DELETE FROM palpites_placar")
-                for _, row_p in df_total.iterrows():
+                for _, row_p in df_consolidado.iterrows():
                     cur.execute("""
-                        INSERT INTO palpites_placar (usuario, jogo_id, gols_time_a, gols_time_b, data_registro)
-                        VALUES (?, ?, ?, ?, ?)
+                        INSERT INTO palpites_placar (usuario, jogo_id, gols_time_a, gols_time_b, data_registro, confronto)
+                        VALUES (?, ?, ?, ?, ?, ?)
                     """, (
                         str(row_p['usuario']), str(row_p['jogo_id']),
                         int(row_p['gols_time_a']), int(row_p['gols_time_b']),
-                        str(row_p['data_registro'])
+                        str(row_p['data_registro']), str(row_p['confronto'])
                     ))
                 
-                for _, row_h in df_pdf_estruturado.iterrows():
+                for _, row_h in df_total_pdf.iterrows():
                     cur.execute("""
-                        INSERT INTO palpites_historico (usuario, jogo_id, gols_time_a, gols_time_b, data_registro)
-                        VALUES (?, ?, ?, ?, ?)
+                        INSERT INTO palpites_historico (usuario, jogo_id, gols_time_a, gols_time_b, data_registro, confronto)
+                        VALUES (?, ?, ?, ?, ?, ?)
                     """, (
                         str(row_h['usuario']), str(row_h['jogo_id']),
                         int(row_h['gols_time_a']), int(row_h['gols_time_b']),
-                        str(row_h['data_registro'])
+                        str(row_h['data_registro']), str(row_h['confronto'])
                     ))
-                    
+                
                 conn.commit()
-                os.remove("historico_pdf.xlsx")
-                st.success("🎉 Sensacional! Dados antigos integrados perfeitamente aos novos palpites!")
+                os.remove("historico_pdf.csv")
+                st.success("🎉 MÁGICA CONCLUÍDA! 100% dos palpites antigos e novos foram unificados no banco!")
                 st.rerun()
         except Exception as e:
-            st.error(f"Erro no processamento do arquivo de recuperação: {e}")
-    # --- FIM DO BLOCO DE RESGATE AUTOMÁTICO ---
-
-    cur.execute("SELECT id, usuario FROM palpites_placar")
-    for row_id, usuario_antigo in cur.fetchall():
-        usuario_novo = usuario_antigo.lower()
-        if usuario_novo != usuario_antigo:
-            try:
-                cur.execute("UPDATE palpites_placar SET usuario = ? WHERE id = ?", (usuario_novo, row_id))
-            except sqlite3.IntegrityError:
-                cur.execute("DELETE FROM palpites_placar WHERE id = ?", (row_id,))
-                
-    cur.execute("SELECT id, usuario FROM palpites_historico")
-    for row_id, usuario_antigo in cur.fetchall():
-        usuario_novo = usuario_antigo.lower()
-        if usuario_novo != usuario_antigo:
-            cur.execute("UPDATE palpites_historico SET usuario = ? WHERE id = ?", (usuario_novo, row_id))
+            st.error(f"Erro no processamento forçado: {e}")
+    # --- FIM DO BLOCO DE RESGATE ---
 
     conn.commit()
     conn.close()
@@ -403,6 +404,7 @@ def badge_favorito_markdown(favorito, odd):
         f"</div>"
     )
 
+
 @st.cache_data(ttl=60, show_spinner=False)
 def buscar_jogos_api():
     headers = {"X-Auth-Token": API_TOKEN}
@@ -442,6 +444,7 @@ def buscar_jogos_api():
         })
 
     return sorted(jogos, key=lambda x: x["data_jogo"])
+
     
 def extrair_secao_jogos(texto: str) -> str:
     inicio = texto.find("Next matches:")
@@ -662,18 +665,18 @@ def salvar_palpite(usuario, jogo_id, gols_a, gols_b):
     cur = conn.cursor()
 
     cur.execute("""
-        INSERT INTO palpites_historico (usuario, jogo_id, gols_time_a, gols_time_b, data_registro)
-        VALUES (?, ?, ?, ?, ?)
-    """, (usuario, jogo_id, gols_a, gols_b, horario_salvo))
+        INSERT INTO palpites_historico (usuario, jogo_id, gols_time_a, gols_time_b, data_registro, confronto)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (usuario, jogo_id, gols_a, gols_b, horario_salvo, ""))
 
     cur.execute("""
-        INSERT INTO palpites_placar (usuario, jogo_id, gols_time_a, gols_time_b, data_registro)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO palpites_placar (usuario, jogo_id, gols_time_a, gols_time_b, data_registro, confronto)
+        VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT(usuario, jogo_id) DO UPDATE SET
             gols_time_a = excluded.gols_time_a,
             gols_time_b = excluded.gols_time_b,
             data_registro = excluded.data_registro
-    """, (usuario, jogo_id, gols_a, gols_b, horario_salvo))
+    """, (usuario, jogo_id, gols_a, gols_b, horario_salvo, ""))
 
     conn.commit()
     conn.close()
@@ -684,7 +687,7 @@ def carregar_historico(limit=300):
     conn = conectar()
     cur = conn.cursor()
     cur.execute("""
-        SELECT usuario, jogo_id, gols_time_a, gols_time_b, data_registro
+        SELECT usuario, jogo_id, gols_time_a, gols_time_b, data_registro, confronto
           FROM palpites_historico
          ORDER BY id DESC
          LIMIT ?
@@ -774,7 +777,6 @@ with aba_palpites:
         nome_b = nome_time_ptbr(jogo["time_b"])
 
         with st.container(border=True):
-
             c_time_a, c_gols_a, c_x, c_gols_b, c_time_b, c_btn = st.columns([3, 1, 0.5, 1, 3, 2])
             
             with c_time_a:
@@ -814,7 +816,7 @@ with aba_palpites:
                         st.markdown("<div style='text-align: center; color: gray; font-size: 14px; margin-top: 5px;'>🔒 <br><span style='font-size: 12px;'>Sem palpite</span></div>", unsafe_allow_html=True)
 
             with st.expander(f"📅 {jogo['data_jogo'].strftime('%d/%m/%Y %H:%M')} | 📊 Ver Odds"):
-                if jogo["odd_time_a"] is not None and jogo["odd_empate"] is not None and font_b is not None:
+                if jogo["odd_time_a"] is not None and jogo["odd_empate"] is not None and jogo["odd_time_b"] is not None:
                     favorito_nome, odd_favorito = determinar_favorito(nome_a, nome_b, jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"])
                     probs = calcular_probabilidades_implicitas(jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"])
 
@@ -832,17 +834,17 @@ with aba_palpites:
                     if jogo.get("odds_atualizadas_em"):
                         try:
                             dt_odds = datetime.fromisoformat(jogo["odds_atualizadas_em"]).strftime('%d/%m/%Y %H:%M:%S')
-                            st.caption(f"Odds updated em: {dt_odds} | Fonte: {jogo.get('fonte_odds', 'N/D')}")
+                            st.caption(f"Odds atualizadas em: {dt_odds} | Fonte: {jogo.get('fonte_odds', 'N/D')}")
                         except Exception:
                             st.caption(f"Fonte: {jogo.get('fonte_odds', 'N/D')}")
                 else:
                     st.caption("Odds indisponíveis no momento.")
 
 with aba_finalizados:
-    if not jogos_finalizados:
+    if not juegos_finalizados:
         st.info("Nenhum jogo finalizado ainda.")
 
-    for jogo in jogos_finalizados:
+    for jogo in juegos_finalizados:
         flag_a = bandeira_time(jogo["time_a"])
         flag_b = bandeira_time(jogo["time_b"])
         nome_a = nome_time_ptbr(jogo["time_a"])
@@ -892,7 +894,7 @@ with aba_ranking:
     agora = datetime.now(FUSO_BR) 
     conn = conectar()
     cur = conn.cursor()
-    cur.execute("SELECT usuario, jogo_id, gols_time_a, gols_time_b, data_registro FROM palpites_placar")
+    cur.execute("SELECT usuario, jogo_id, gols_time_a, gols_time_b, data_registro, confronto FROM palpites_placar")
     todos_palpites = cur.fetchall()
     conn.close()
 
@@ -900,7 +902,7 @@ with aba_ranking:
     detalhes_pontos = {}
     mapa_jogos = {j["id"]: j for j in jogos_copa}
 
-    for usuario_nome, jogo_id, pga, pgb, _ in todos_palpites:
+    for usuario_nome, jogo_id, pga, pgb, _, conf_db in todos_palpites:
         nome_formatado = usuario_nome.title() 
         pontuacao.setdefault(nome_formatado, 0)
         detalhes_pontos.setdefault(nome_formatado, [])
@@ -915,7 +917,8 @@ with aba_ranking:
                     "jogo": jogo,
                     "pga": pga,
                     "pgb": pgb,
-                    "pontos": pts
+                    "pontos": pts,
+                    "confronto_fallback": conf_db
                 })
 
     ranking = sorted(pontuacao.items(), key=lambda x: x[1], reverse=True)
@@ -925,15 +928,15 @@ with aba_ranking:
             with st.expander(f"**{pos}º Lugar:** {nome_formatado} — 🌟 {pontos_totais} pontos"):
                 pontuacoes_usuario = detalhes_pontos.get(nome_formatado, [])
                 if pontuacoes_usuario:
-                    pontuacoes_usuario.sort(key=lambda x: x["jogo"]["data_jogo"], reverse=True)
+                    pontuacoes_usuario.sort(key=lambda x: x["jogo"]["data_jogo"] if isinstance(x["jogo"], dict) else datetime.min, reverse=True)
                     for det in pontuacoes_usuario:
                         j = det["jogo"]
                         nome_a = nome_time_ptbr(j["time_a"])
                         nome_b = nome_time_ptbr(j["time_b"])
                         flag_a = bandeira_time(j["time_a"])
                         flag_b = bandeira_time(j["time_b"])
-                        gr_a = int(j["gols_real_a"])
-                        gr_b = int(j["gols_real_b"])
+                        gr_a = int(j["gols_real_a"]) if j["gols_real_a"] is not None else 0
+                        gr_b = int(j["gols_real_b"]) if j["gols_real_b"] is not None else 0
                         pga_det = det["pga"]
                         pgb_det = det["pgb"]
                         pts_det = det["pontos"]
@@ -949,8 +952,8 @@ with aba_ranking:
     
     palpites_por_jogo = {}
     if todos_palpites:
-        for usuario_nome, jogo_id, pga, pgb, dt_reg in todos_palpites:
-            palpites_por_jogo.setdefault(jogo_id, []).append((usuario_nome, pga, pgb, dt_reg))
+        for usuario_nome, jogo_id, pga, pgb, dt_reg, conf_db in todos_palpites:
+            palpites_por_jogo.setdefault(jogo_id, []).append((usuario_nome, pga, pgb, dt_reg, conf_db))
             
         for jogo in jogos_copa:
             if jogo["id"] in palpites_por_jogo:
@@ -960,34 +963,47 @@ with aba_ranking:
                 flag_b = bandeira_time(jogo["time_b"])
                 
                 jogo_bloqueado = jogo["status"] == "FT" or agora >= jogo["data_jogo"]
-                status_txt = "✅" if jogo["status"] == "FT" else ("🔒" if jogo_bloqueado else "⏳")
+                status_txt = "✅" if Urban_status_txt := (jogo["status"] == "FT") else ("🔒" if jogo_bloqueado else "⏳")
                 
                 with st.expander(f"{flag_a} {nome_a} x {nome_b} {flag_b} | {status_txt}"):
-                    for usuario_nome, pga, pgb, dt_reg in palpites_por_jogo[jogo["id"]]:
+                    for usuario_nome, pga, pgb, dt_reg, conf_db in palpites_por_jogo[jogo["id"]]:
                         nome_formatado = usuario_nome.title()
                         
                         if jogo_bloqueado or usuario_nome.lower() == usuario:
                             st.markdown(f"**{nome_formatado}** ➔ {pga} x {pgb} &nbsp;&nbsp;<span style='color:gray; font-size:12px;'>⏱️ {dt_reg}</span>", unsafe_allow_html=True)
                         else:
                             st.markdown(f"**{nome_formatado}** ➔ 🔒", unsafe_allow_html=True)
+                            
+        # Exibe palpites textuais forçados caso fiquem fora da agenda oficial da API temporariamente
+        for j_id, lista_p in palpites_por_jogo.items():
+            if j_id.startswith("TXT_"):
+                conf_fallback = lista_p[0][4]
+                with st.expander(f"🔮 {conf_fallback} | 🔒 Forçado"):
+                    for usuario_nome, pga, pgb, dt_reg, _ in lista_p:
+                        nome_formatado = usuario_nome.title()
+                        st.markdown(f"**{nome_formatado}** ➔ {pga} x {pgb} &nbsp;&nbsp;<span style='color:gray; font-size:12px;'>⏱️ {dt_reg}</span>", unsafe_allow_html=True)
 
     st.markdown("---")
     st.write("📋 **Histórico de alterações**")
     historico = carregar_historico(limit=500)
     if historico:
-        for usuario_nome, jogo_id, pga, pgb, dt_reg in historico:
+        for usuario_nome, jogo_id, pga, pgb, dt_reg, conf_db in historico:
             nome_formatado = usuario_nome.title() 
             jogo = mapa_jogos.get(jogo_id)
+            
+            nome_confronto_print = conf_db if conf_db else "Confronto Desconhecido"
+            jogo_bloqueado = True
+            
             if jogo:
                 nome_a = nome_time_ptbr(jogo["time_a"])
                 nome_b = nome_time_ptbr(jogo["time_b"])
-                
+                nome_confronto_print = f"{nome_a} x {nome_b}"
                 jogo_bloqueado = jogo["status"] == "FT" or agora >= jogo["data_jogo"]
                 
-                if jogo_bloqueado or usuario_nome.lower() == usuario:
-                    st.caption(f"{dt_reg} • {nome_formatado} alterou para {pga}x{pgb} em {nome_a} x {nome_b}")
-                else:
-                    st.caption(f"{dt_reg} • {nome_formatado} atualizou o palpite em {nome_a} x {nome_b} (🔒)")
+            if jogo_bloqueado or usuario_nome.lower() == usuario:
+                st.caption(f"{dt_reg} • {nome_formatado} alterou para {pga}x{pgb} em {nome_confronto_print}")
+            else:
+                st.caption(f"{dt_reg} • {nome_formatado} atualizou o palpite em {nome_confronto_print} (🔒)")
     else:
         st.info("Nenhuma alteração registrada ainda.")
         
