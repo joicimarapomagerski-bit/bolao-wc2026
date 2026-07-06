@@ -963,7 +963,7 @@ with aba_ranking:
                 flag_b = bandeira_time(jogo["time_b"])
                 
                 jogo_bloqueado = jogo["status"] == "FT" or agora >= jogo["data_jogo"]
-                status_txt = "✅" if Urban_status_txt := (jogo["status"] == "FT") else ("🔒" if jogo_bloqueado else "⏳")
+                status_txt = "✅" if Urban_status_txt = (jogo["status"] == "FT") else ("🔒" if jogo_bloqueado else "⏳")
                 
                 with st.expander(f"{flag_a} {nome_a} x {nome_b} {flag_b} | {status_txt}"):
                     for usuario_nome, pga, pgb, dt_reg, conf_db in palpites_por_jogo[jogo["id"]]:
