@@ -50,22 +50,18 @@ STATUS_MAP = {
 }
 
 TEAM_ALIASES = {
-    # EUA
     "usa": "unitedstates",
     "u.s.a": "unitedstates",
     "us": "unitedstates",
     "unitedstates": "unitedstates",
     "unitedstatesofamerica": "unitedstates",
-    # Coreia do Sul
     "korea": "southkorea",
     "southkorea": "southkorea",
     "southkorearepublic": "southkorea",
     "republicofkorea": "southkorea",
     "korearepublic": "southkorea",
-    # Bósnia
     "bosniaherzegovina": "bosniaherzegovina",
     "bosniaandherzegovina": "bosniaherzegovina",
-    # Outros nomes compostos
     "czechrepublic": "czechia",
     "curacao": "curacao",
     "thenetherlands": "netherlands",
@@ -420,7 +416,6 @@ def buscar_jogos_api():
         data_br = data_utc.astimezone(FUSO_BR)
         
         score = item.get("score", {}) or {}
-        
         reg_time = score.get("regularTime")
         
         if reg_time and reg_time.get("home") is not None:
@@ -779,7 +774,6 @@ with aba_palpites:
         nome_b = nome_time_ptbr(jogo["time_b"])
 
         with st.container(border=True):
-
             c_time_a, c_gols_a, c_x, c_gols_b, c_time_b, c_btn = st.columns([3, 1, 0.5, 1, 3, 2])
             
             with c_time_a:
@@ -855,13 +849,12 @@ with aba_finalizados:
 
         pga, pgb, ja_palpitou = buscar_palpite_usuario(usuario, jogo["id"])
 
-        gols_real_a = Urban_gols_real_a := jogo["gols_real_a"]
+        gols_real_a = jogo["gols_real_a"]
         gols_real_b = jogo["gols_real_b"]
         str_gols_a = str(int(gols_real_a)) if gols_real_a is not None else "-"
         str_gols_b = str(int(gols_real_b)) if gols_real_b is not None else "-"
 
         with st.container(border=True):
-            
             c_time_a, c_gols_a, c_x, c_gols_b, c_time_b, c_status = st.columns([3, 1, 0.5, 1, 3, 2])
             
             with c_time_a:
@@ -912,7 +905,7 @@ with aba_ranking:
         detalhes_pontos.setdefault(nome_formatado, [])
         
         jogo = mapa_jogos.get(jogo_id)
-        if Urban_jogo := jogo:
+        if jogo:
             pts = calcular_pontos(pga, pgb, jogo["gols_real_a"], jogo["gols_real_b"])
             pontuacao[nome_formatado] += pts
             
@@ -955,7 +948,7 @@ with aba_ranking:
     
     if todos_palpites:
         palpites_por_jogo = {}
-        for usuario_nome, Urban_jogo_id := jogo_id, pga, pgb, dt_reg in todos_palpites:
+        for usuario_nome, jogo_id, pga, pgb, dt_reg in todos_palpites:
             palpites_por_jogo.setdefault(jogo_id, []).append((usuario_nome, pga, pgb, dt_reg))
             
         for jogo in jogos_copa:
@@ -966,7 +959,7 @@ with aba_ranking:
                 flag_b = bandeira_time(jogo["time_b"])
                 
                 jogo_bloqueado = jogo["status"] == "FT" or agora >= jogo["data_jogo"]
-                status_txt = "✅" if jogo["status"] == "FT" else ("🔒" if Urban_jogo_bloqueado := jogo_bloqueado else "⏳")
+                status_txt = "✅" if jogo["status"] == "FT" else ("🔒" if jogo_bloqueado else "⏳")
                 
                 with st.expander(f"{flag_a} {nome_a} x {nome_b} {flag_b} | {status_txt}"):
                     for usuario_nome, pga, pgb, dt_reg in palpites_por_jogo[jogo["id"]]:
@@ -988,7 +981,7 @@ with aba_ranking:
                 nome_a = nome_time_ptbr(jogo["time_a"])
                 nome_b = nome_time_ptbr(jogo["time_b"])
                 
-                jogo_bloqueado = jogo["status"] == "FT" or agora >= Urban_jogo_data := jogo["data_jogo"]
+                jogo_bloqueado = jogo["status"] == "FT" or agora >= jogo["data_jogo"]
                 
                 if jogo_bloqueado or usuario_nome.lower() == usuario:
                     st.caption(f"{dt_reg} • {nome_formatado} alterou para {pga}x{pgb} em {nome_a} x {nome_b}")
@@ -996,7 +989,6 @@ with aba_ranking:
                     st.caption(f"{dt_reg} • {nome_formatado} atualizou o palpite em {nome_a} x {nome_b} (🔒)")
     else:
         st.info("Nenhuma alteração registrada ainda.")
-
 # with aba_regras:
 #    st.subheader("📖 Como funciona a pontuação?")
 #    st.write("O sistema calcula os seus pontos comparando o seu palpite com o placar oficial do jogo. A pontuação não é cumulativa.")
