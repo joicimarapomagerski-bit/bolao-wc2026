@@ -366,7 +366,7 @@ with aba_ranking:
             chave_confronto = f"{ta_pt} x {tb_pt}"
             
             palpites_jogo = df_palpites[df_palpites['confronto'] == chave_confronto]
-            for _, p in palindromos_jogo := palpites_jogo.iterrows():
+            for _, p in palpites_jogo.iterrows():
                 if p['usuario'] in pontuacao:
                     pts = calcular_pontos(p['gols_time_a'], p['gols_time_b'], j['gols_oficial_a'], j['gols_oficial_b'])
                     pontuacao[p['usuario']] += pts
@@ -412,7 +412,7 @@ with aba_historico:
             else:
                 st.caption(f"{p['data_registro']} • {nome_formatado} atualizou o palpite em {p['confronto']} (🔒)")
     else:
-        st.info("Nenhuma alteration registrada ainda.")
+        st.info("Nenhuma alteração registrada ainda.")
 
 # with aba_regras:
 #    st.subheader("📖 Como funciona a pontuação?")
