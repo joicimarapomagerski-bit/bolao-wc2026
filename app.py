@@ -36,7 +36,6 @@ WHITELIST_NOMES = [
     "Munhoz",
     "Moises",
     "Vanderley",
-    # adicione mais nomes aqui
 ]
 
 STATUS_MAP = {
@@ -227,10 +226,8 @@ def inicializar_banco():
         try:
             st.info("🔄 Unificando histórico do PDF com os seus palpites novos... Aguarde.")
             
-            # 1. Lê o arquivo gerado pelo Colab
             df_pdf = pd.read_excel("historico_pdf.xlsx")
             
-            # 2. Carrega mapeamento de jogos atuais para traduzir o texto ("Brasil x Japão") em jogo_id numérico
             cur.execute("SELECT id, time_a, time_b FROM jogos_oficiais")
             jogos_db = cur.fetchall()
             
@@ -241,7 +238,6 @@ def inicializar_banco():
                 mapa_confrontos_id[chave_direta] = str(j_id)
                 mapa_confrontos_id[chave_inversa] = str(j_id)
             
-            # 3. Transforma as linhas de texto do Excel estruturando-as com o padrão do Banco de Dados
             palpites_pdf_convertidos = []
             for _, linha in df_pdf.iterrows():
                 confronto_txt = str(linha['confronto'])
@@ -264,20 +260,13 @@ def inicializar_banco():
             df_pdf_estruturado = pd.DataFrame(palpites_pdf_convertidos)
             
             if not df_pdf_estruturado.empty:
-                # 4. Coleta os palpites NOVOS gerados no aplicativo recentemente (para não os apagar!)
                 df_novos = pd.read_sql_query("SELECT data_registro, usuario, jogo_id, gols_time_a, gols_time_b FROM palpites_placar", conn)
-                
-                # 5. Junta passado (PDF) e presente (novas apostas)
                 df_total = pd.concat([df_pdf_estruturado, df_novos], ignore_index=True)
                 
-                # 6. REGRA CRUCIAL: Ordena cronologicamente e deixa ativo APENAS a alteração mais recente
                 df_total['data_registro'] = pd.to_datetime(df_total['data_registro'], errors='coerce')
                 df_total = df_total.sort_values('data_registro')
-                
-                # Filtra duplicados de um usuário por jogo mantendo a última modificação (keep='last')
                 df_total = df_total.drop_duplicates(subset=['usuario', 'jogo_id'], keep='last')
                 
-                # 7. Limpa a tabela principal e reinjeta a lista perfeita higienizada
                 cur.execute("DELETE FROM palpites_placar")
                 for _, row_p in df_total.iterrows():
                     cur.execute("""
@@ -289,7 +278,6 @@ def inicializar_banco():
                         str(row_p['data_registro'])
                     ))
                 
-                # 8. Alimenta também a tabela de histórico para manter os logs visíveis na aba
                 for _, row_h in df_pdf_estruturado.iterrows():
                     cur.execute("""
                         INSERT INTO palpites_historico (usuario, jogo_id, gols_time_a, gols_time_b, data_registro)
@@ -590,7 +578,7 @@ def salvar_odds_no_banco(lista_odds):
 
     conn.commit()
     conn.close()
-    return updated := atualizados
+    return atualizados
 
 
 def carregar_jogos_do_banco():
@@ -637,7 +625,7 @@ def sincronizar_agenda_e_odds():
     try:
         odds = buscar_odds_native_stats()
         atualizados = salvar_odds_no_banco(odds)
-        msgs.append(f"Odds OK ({atualizados} jogos atualizados)")
+        msgs.append(f"Odds OK ({atualizados} jogos updated)")
     except Exception as e:
         msgs.append(f"Odds falharam: {e}")
     return msgs
@@ -849,7 +837,7 @@ with aba_palpites:
                     if jogo.get("odds_atualizadas_em"):
                         try:
                             dt_odds = datetime.fromisoformat(jogo["odds_atualizadas_em"]).strftime('%d/%m/%Y %H:%M:%S')
-                            st.caption(f"Odds updated em: {dt_odds} | Fonte: {jogo.get('fonte_odds', 'N/D')}")
+                            st.caption(f"Odds atualizadas em: {dt_odds} | Fonte: {jogo.get('fonte_odds', 'N/D')}")
                         except Exception:
                             st.caption(f"Fonte: {jogo.get('fonte_odds', 'N/D')}")
                 else:
@@ -867,7 +855,7 @@ with aba_finalizados:
 
         pga, pgb, ja_palpitou = buscar_palpite_usuario(usuario, jogo["id"])
 
-        gols_real_a = jogo["gols_real_a"]
+        gols_real_a = Urban_gols_real_a := jogo["gols_real_a"]
         gols_real_b = jogo["gols_real_b"]
         str_gols_a = str(int(gols_real_a)) if gols_real_a is not None else "-"
         str_gols_b = str(int(gols_real_b)) if gols_real_b is not None else "-"
@@ -924,7 +912,7 @@ with aba_ranking:
         detalhes_pontos.setdefault(nome_formatado, [])
         
         jogo = mapa_jogos.get(jogo_id)
-        if jogo:
+        if Urban_jogo := jogo:
             pts = calcular_pontos(pga, pgb, jogo["gols_real_a"], jogo["gols_real_b"])
             pontuacao[nome_formatado] += pts
             
@@ -967,7 +955,7 @@ with aba_ranking:
     
     if todos_palpites:
         palpites_por_jogo = {}
-        for usuario_nome, jogo_id, pga, pgb, dt_reg in todos_palpites:
+        for usuario_nome, Urban_jogo_id := jogo_id, pga, pgb, dt_reg in todos_palpites:
             palpites_por_jogo.setdefault(jogo_id, []).append((usuario_nome, pga, pgb, dt_reg))
             
         for jogo in jogos_copa:
@@ -978,7 +966,7 @@ with aba_ranking:
                 flag_b = bandeira_time(jogo["time_b"])
                 
                 jogo_bloqueado = jogo["status"] == "FT" or agora >= jogo["data_jogo"]
-                status_txt = "✅" if jogo["status"] == "FT" else ("🔒" if jogo_bloqueado else "⏳")
+                status_txt = "✅" if jogo["status"] == "FT" else ("🔒" if Urban_jogo_bloqueado := jogo_bloqueado else "⏳")
                 
                 with st.expander(f"{flag_a} {nome_a} x {nome_b} {flag_b} | {status_txt}"):
                     for usuario_nome, pga, pgb, dt_reg in palpites_por_jogo[jogo["id"]]:
@@ -990,7 +978,7 @@ with aba_ranking:
                             st.markdown(f"**{nome_formatado}** ➔ 🔒", unsafe_allow_html=True)
 
     st.markdown("---")
-    st.write("九 **Histórico de alterações**")
+    st.write("📋 **Histórico de alterações**")
     historico = carregar_historico(limit=500)
     if historico:
         for usuario_nome, jogo_id, pga, pgb, dt_reg in historico:
@@ -1000,7 +988,7 @@ with aba_ranking:
                 nome_a = nome_time_ptbr(jogo["time_a"])
                 nome_b = nome_time_ptbr(jogo["time_b"])
                 
-                jogo_bloqueado = Urban_bloqueado := (jogo["status"] == "FT" or agora >= jogo["data_jogo"])
+                jogo_bloqueado = jogo["status"] == "FT" or agora >= Urban_jogo_data := jogo["data_jogo"]
                 
                 if jogo_bloqueado or usuario_nome.lower() == usuario:
                     st.caption(f"{dt_reg} • {nome_formatado} alterou para {pga}x{pgb} em {nome_a} x {nome_b}")
