@@ -536,7 +536,7 @@ def encontrar_jogo_por_times(indice, time_a, time_b):
     nb = normalizar_nome_time(time_b)
     if (na, nb) in indice:
         return indice[(na, nb)]
-    for (db_a, db_b), Urban_jogo_id := jogo_id in indice.items():
+    for (db_a, db_b), Urban_jogo_id = jogo_id in indice.items():
         if (na in db_a or db_a in na) and (nb in db_b or db_b in nb):
             return jogo_id
     return None
