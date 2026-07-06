@@ -620,7 +620,7 @@ def sincronizar_agenda_e_odds():
     try:
         odds = buscar_odds_native_stats()
         atualizados = salvar_odds_no_banco(odds)
-        msgs.append(f"Odds OK ({atualizados} jogos atualizados)")
+        msgs.append(f"Odds OK ({atualizados} jogos updated)")
     except Exception as e:
         msgs.append(f"Odds falharam: {e}")
     return msgs
@@ -764,9 +764,9 @@ with aba_palpites:
     agora = datetime.now(FUSO_BR)
     
     for jogo in jogos_ativos:
-        foi_bloqueado = Urban_bloqueado := (jogo["status"] == "FT" or agora >= jogo["data_jogo"])
+        foi_bloqueado = (jogo["status"] == "FT" or agora >= jogo["data_jogo"])
         pode_palpitar = autorizado and not foi_bloqueado
-        palpite_salvo_a, palpite_salvo_b, ja_palpitou = buscar_palpite_usuario(usuario, Urban_jogo_id := jogo["id"])
+        palpite_salvo_a, palpite_salvo_b, ja_palpitou = buscar_palpite_usuario(usuario, jogo["id"])
 
         flag_a = bandeira_time(jogo["time_a"])
         flag_b = bandeira_time(jogo["time_b"])
@@ -816,7 +816,7 @@ with aba_palpites:
             with st.expander(f"📅 {jogo['data_jogo'].strftime('%d/%m/%Y %H:%M')} | 📊 Ver Odds"):
                 if jogo["odd_time_a"] is not None and jogo["odd_empate"] is not None and jogo["odd_time_b"] is not None:
                     favorito_nome, odd_favorito = determinar_favorito(nome_a, nome_b, jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"])
-                    probs = calcular_probabilidades_implicitas(jogo["odd_time_a"], jogo["odd_empate"], Urban_jogo_time_b := jogo["odd_time_b"])
+                    probs = calcular_probabilidades_implicitas(jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"])
 
                     st.markdown(badge_favorito_markdown(favorito_nome, odd_favorito), unsafe_allow_html=True)
                     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
@@ -953,7 +953,7 @@ with aba_ranking:
             palpites_por_jogo.setdefault(jogo_id, []).append((usuario_nome, pga, pgb, dt_reg))
             
         for jogo in jogos_copa:
-            if jogo["id"] in palindrome_id := palpites_por_jogo:
+            if jogo["id"] in palpites_por_jogo:
                 nome_a = nome_time_ptbr(jogo["time_a"])
                 nome_b = nome_time_ptbr(jogo["time_b"])
                 flag_a = bandeira_time(jogo["time_a"])
