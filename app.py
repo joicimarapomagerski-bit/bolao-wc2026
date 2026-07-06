@@ -21,7 +21,7 @@ NATIVE_STATS_URL = "https://native-stats.org/competition/WC/"
 API_LOGIN_EMAIL = "joicimara.pomagerskii@gmail.com"
 
 # =========================
-WHITELIST_NOMES = [\
+WHITELIST_NOMES = [
     "Joici",
     "Isa",
     "Dudu",
@@ -73,26 +73,34 @@ import pandas as pd
 
 if os.path.exists("historico_pdf.xlsx"):
     try:
-        st.info("🔄 Processando arquivo Excel de recuperação... Aguarde.")
+        st.info("🔄 Unificando dados salvos do PDF com os novos palpites... Aguarde.")
         
-        # 1. Lê os dados recuperados do PDF que estão no Excel
+        # 1. Lê o Excel gerado pelo seu script offline do Colab
         df_pdf = pd.read_excel("historico_pdf.xlsx")
         
-        # Força os nomes das colunas para baterem com o banco de dados
-        df_pdf.columns = ['data_registro', 'usuario', 'gols_time_a', 'gols_time_b', 'confronto']
+        # Mapeia os títulos exatos gerados pelo Colab para bater com o Banco de Dados
+        df_pdf = df_pdf.rename(columns={
+            'placar_time_a': 'gols_time_a',
+            'placar_time_b': 'gols_time_b'
+        })
         
-        # 2. Puxa os palpites novos que já estão no banco para não perder nada
+        # Garante a ordem correta das colunas
+        df_pdf = df_pdf[['data_registro', 'usuario', 'gols_time_a', 'gols_time_b', 'confronto']]
+        
+        # 2. Puxa os palpites NOVOS que já estão no banco de dados para não perder nada
         df_novos = pd.read_sql_query("SELECT data_registro, usuario, gols_time_a, gols_time_b, confronto FROM palpites_placar", conn)
         
-        # 3. Junta o histórico do PDF com os palpites novos
+        # 3. Junta o passado (PDF) com o presente (novos registros do app)
         df_total = pd.concat([df_pdf, df_novos], ignore_index=True)
         
-        # 4. REGRA DO RANKING: Organiza por data e mantém APENAS a alteração mais recente
+        # 4. REGRA DO RANKING: Organiza por data cronológica
         df_total['data_registro'] = pd.to_datetime(df_total['data_registro'], errors='coerce')
         df_total = df_total.sort_values('data_registro')
+        
+        # Remove duplicadas de uma pessoa para o mesmo confronto, mantendo SEMPRE a última alteração (keep='last')
         df_total = df_total.drop_duplicates(subset=['usuario', 'confronto'], keep='last')
         
-        # 5. Limpa a tabela e insere os dados perfeitos e unificados
+        # 5. Limpa temporariamente a tabela antiga para reinserir o bloco consolidado sem dar conflitos
         cursor.execute("DELETE FROM palpites_placar")
         for _, linha in df_total.iterrows():
             cursor.execute("""
@@ -108,12 +116,12 @@ if os.path.exists("historico_pdf.xlsx"):
         
         conn.commit()
         
-        # 6. Apaga o Excel para o processo rodar apenas uma vez
+        # 6. Remove o arquivo Excel para que o processo seja executado de forma definitiva apenas uma vez
         os.remove("historico_pdf.xlsx")
-        st.success("🎉 Sensacional! Todos os palpites antigos e novos foram unificados com sucesso!")
+        st.success("🎉 Processo concluído! Histórico antigo restaurado e integrado aos novos palpites com sucesso!")
         
     except Exception as e:
-        st.error(f"Erro ao processar o arquivo Excel de recuperação: {e}")
+        st.error(f"Erro ao processar as colunas do arquivo Excel: {e}")
 # --- FIM DO BLOCO DE RESGATE AUTOMÁTICO ---
 
 conn.close()
@@ -358,7 +366,7 @@ with aba_ranking:
             chave_confronto = f"{ta_pt} x {tb_pt}"
             
             palpites_jogo = df_palpites[df_palpites['confronto'] == chave_confronto]
-            for _, p in palpites_jogo.iterrows():
+            for _, p in palindromos_jogo := palpites_jogo.iterrows():
                 if p['usuario'] in pontuacao:
                     pts = calcular_pontos(p['gols_time_a'], p['gols_time_b'], j['gols_oficial_a'], j['gols_oficial_b'])
                     pontuacao[p['usuario']] += pts
@@ -387,7 +395,6 @@ with aba_historico:
             user_lower = p['usuario'].strip().lower()
             nome_formatado = next((n for n in WHITELIST_NOMES if n.lower() == user_lower), p['usuario'])
             
-            # Tenta encontrar o status do jogo para saber se bloqueia a exibição do placar ou não
             jogo_encontrado = None
             for j in jogos:
                 ta_pt = traduzir_nome_time_ptbr(j["time_a"])
@@ -405,7 +412,7 @@ with aba_historico:
             else:
                 st.caption(f"{p['data_registro']} • {nome_formatado} atualizou o palpite em {p['confronto']} (🔒)")
     else:
-        st.info("Nenhuma alteração registrada ainda.")
+        st.info("Nenhuma alteration registrada ainda.")
 
 # with aba_regras:
 #    st.subheader("📖 Como funciona a pontuação?")
