@@ -140,7 +140,7 @@ TEAM_META = {
     "turkey": {"flag": "🇹🇷", "ptbr": "Turquia"},
     "unitedstates": {"flag": "🇺🇸", "ptbr": "Estados Unidos"},
     "uruguay": {"flag": "🇺🇾", "ptbr": "Uruguai"},
-    "wales": {"flag": "🏴󠁧󠁢󠁷󠁬󠁳󠁿", "ptbr": "País de Gales"},
+    "wales": {"flag": "🏴󠁧󠁢󠁷󠁬assem", "ptbr": "País de Gales"},
     "tunisia": {"flag": "🇹🇳", "ptbr": "Tunísia"},
     "algeria": {"flag": "🇩🇿", "ptbr": "Argélia"},
     "capeverde": {"flag": "🇨🇻", "ptbr": "Cabo Verde"},
@@ -165,6 +165,44 @@ def adicionar_coluna_se_nao_existir(cursor, tabela, definicao_coluna):
     except sqlite3.OperationalError as e:
         if "duplicate column name" not in str(e).lower():
             raise
+
+
+def normalizar_texto(txt: str) -> str:
+    txt = unicodedata.normalize("NFKD", txt or "")
+    txt = "".join(c for c in txt if not unicodedata.combining(c))
+    txt = txt.strip().lower()
+    txt = txt.replace("&", " and ")
+    txt = re.sub(r"[^a-z0-9 ]", " ", txt)
+    txt = re.sub(r"\s+", " ", txt).strip()
+    return txt
+
+
+def normalizar_nome_time(nome: str) -> str:
+    nome = normalizar_texto(nome).replace(" ", "")
+    return TEAM_ALIASES.get(nome, nome)
+
+
+def nome_time_ptbr(nome_time: str) -> str:
+    key = normalizar_nome_time(nome_time)
+    meta = TEAM_META.get(key)
+    return meta["ptbr"] if meta else nome_time
+
+
+def bandeira_time(nome_time: str) -> str:
+    key = normalizar_nome_time(nome_time)
+    meta = TEAM_META.get(key)
+    return meta["flag"] if meta else "🏳️"
+
+
+def nome_usuario_normalizado(nome: str) -> str:
+    return normalizar_texto(nome)
+
+
+def usuario_autorizado(nome: str) -> bool:
+    if not nome:
+        return False
+    wl = {nome_usuario_normalizado(x) for x in WHITELIST_NOMES if x.strip()}
+    return nome_usuario_normalizado(nome) in wl
 
 
 def inicializar_banco():
@@ -309,44 +347,6 @@ def inicializar_banco():
 
     conn.commit()
     conn.close()
-
-
-def normalizar_texto(txt: str) -> str:
-    txt = unicodedata.normalize("NFKD", txt or "")
-    txt = "".join(c for c in txt if not unicodedata.combining(c))
-    txt = txt.strip().lower()
-    txt = txt.replace("&", " and ")
-    txt = re.sub(r"[^a-z0-9 ]", " ", txt)
-    txt = re.sub(r"\s+", " ", txt).strip()
-    return txt
-
-
-def normalizar_nome_time(nome: str) -> str:
-    nome = normalizar_texto(nome).replace(" ", "")
-    return TEAM_ALIASES.get(nome, nome)
-
-
-def nome_time_ptbr(nome_time: str) -> str:
-    key = normalizar_nome_time(nome_time)
-    meta = TEAM_META.get(key)
-    return meta["ptbr"] if meta else nome_time
-
-
-def bandeira_time(nome_time: str) -> str:
-    key = normalizar_nome_time(nome_time)
-    meta = TEAM_META.get(key)
-    return meta["flag"] if meta else "🏳️"
-
-
-def nome_usuario_normalizado(nome: str) -> str:
-    return normalizar_texto(nome)
-
-
-def usuario_autorizado(nome: str) -> bool:
-    if not nome:
-        return False
-    wl = {nome_usuario_normalizado(x) for x in WHITELIST_NOMES if x.strip()}
-    return nome_usuario_normalizado(nome) in wl
 
 
 def limpar_rotulo_time(rotulo: str) -> str:
@@ -814,7 +814,7 @@ with aba_palpites:
                         st.markdown("<div style='text-align: center; color: gray; font-size: 14px; margin-top: 5px;'>🔒 <br><span style='font-size: 12px;'>Sem palpite</span></div>", unsafe_allow_html=True)
 
             with st.expander(f"📅 {jogo['data_jogo'].strftime('%d/%m/%Y %H:%M')} | 📊 Ver Odds"):
-                if jogo["odd_time_a"] is not None and jogo["odd_empate"] is not None and jogo["odd_time_b"] is not None:
+                if jogo["odd_time_a"] is not None and jogo["odd_empate"] is not None and font_b is not None:
                     favorito_nome, odd_favorito = determinar_favorito(nome_a, nome_b, jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"])
                     probs = calcular_probabilidades_implicitas(jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"])
 
@@ -832,7 +832,7 @@ with aba_palpites:
                     if jogo.get("odds_atualizadas_em"):
                         try:
                             dt_odds = datetime.fromisoformat(jogo["odds_atualizadas_em"]).strftime('%d/%m/%Y %H:%M:%S')
-                            st.caption(f"Odds atualizadas em: {dt_odds} | Fonte: {jogo.get('fonte_odds', 'N/D')}")
+                            st.caption(f"Odds updated em: {dt_odds} | Fonte: {jogo.get('fonte_odds', 'N/D')}")
                         except Exception:
                             st.caption(f"Fonte: {jogo.get('fonte_odds', 'N/D')}")
                 else:
@@ -947,8 +947,8 @@ with aba_ranking:
     st.markdown("---")
     st.write("📋 **Palpites válidos para o Ranking**")
     
+    palpites_por_jogo = {}
     if todos_palpites:
-        palpites_por_jogo = {}
         for usuario_nome, jogo_id, pga, pgb, dt_reg in todos_palpites:
             palpites_por_jogo.setdefault(jogo_id, []).append((usuario_nome, pga, pgb, dt_reg))
             
