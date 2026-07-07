@@ -656,73 +656,24 @@ def buscar_palpite_usuario(usuario, jogo_id):
     return (0, 0, False)
 
 
-# --- FUNÇÃO DE SALVAR COM GHOST MODE (100% INDETECTÁVEL) ---
-def salvar_palpite(usuario, jogo_id, gols_a, gols_b, eh_stealth=False):
+def salvar_palpite(usuario, jogo_id, gols_a, gols_b):
     horario_salvo = datetime.now(FUSO_BR).strftime("%d/%m/%Y %H:%M:%S")
     conn = conectar()
     cur = conn.cursor()
 
-    if eh_stealth:
-        # GHOST EDIT: Altera o placar valendo ponto SEM deixar rastro de alteração no log
+    cur.execute("""
+        INSERT INTO palpites_historico (usuario, jogo_id, gols_time_a, gols_time_b, data_registro, confronto)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (usuario, jogo_id, gols_a, gols_b, horario_salvo, ""))
 
-        # 1. Tenta atualizar o placar oficial mantendo a data original exata de quando foi feito
-        cur.execute("""
-            UPDATE palpites_placar
-            SET gols_time_a = ?, gols_time_b = ?
-            WHERE usuario = ? AND jogo_id = ?
-        """, (gols_a, gols_b, usuario, jogo_id))
-
-        # Se afetou 0 linhas (significa que você tinha esquecido de apostar nesse jogo),
-        # criamos um registro fantasma com data retroativa (2 horas antes da partida começar!)
-        if cur.rowcount == 0:
-            fake_time = horario_salvo
-            try:
-                cur.execute("SELECT data_jogo FROM jogos_oficiais WHERE id = ?", (jogo_id,))
-                row_jogo = cur.fetchone()
-                if row_jogo and row_jogo[0]:
-                    dt_jogo = datetime.fromisoformat(row_jogo[0])
-                    fake_time = (dt_jogo - timedelta(seconds=97)).strftime("%d/%m/%Y %H:%M:%S")
-            except Exception:
-                pass
-
-            cur.execute("""
-                INSERT INTO palpites_placar (usuario, jogo_id, gols_time_a, gols_time_b, data_registro)
-                VALUES (?, ?, ?, ?, ?)
-            """, (usuario, jogo_id, gols_a, gols_b, fake_time))
-
-            # Insere no histórico com a mesma data falsa do passado
-            cur.execute("""
-                INSERT INTO palpites_historico (usuario, jogo_id, gols_time_a, gols_time_b, data_registro)
-                VALUES (?, ?, ?, ?, ?)
-            """, (usuario, jogo_id, gols_a, gols_b, fake_time))
-        else:
-            # Se você já tinha um palpite antigo, atualiza o placar dele no histórico silenciosamente,
-            # para que quem olhar a lista de histórico veja que você "sempre" apostou naquele placar.
-            cur.execute("""
-                UPDATE palpites_historico
-                SET gols_time_a = ?, gols_time_b = ?
-                WHERE id = (
-                    SELECT id FROM palpites_historico 
-                    WHERE usuario = ? AND jogo_id = ? 
-                    ORDER BY id DESC LIMIT 1
-                )
-            """, (gols_a, gols_b, usuario, jogo_id))
-
-    else:
-        # Fluxo normal para apostas legítimas
-        cur.execute("""
-            INSERT INTO palpites_historico (usuario, jogo_id, gols_time_a, gols_time_b, data_registro)
-            VALUES (?, ?, ?, ?, ?)
-        """, (usuario, jogo_id, gols_a, gols_b, horario_salvo))
-
-        cur.execute("""
-            INSERT INTO palpites_placar (usuario, jogo_id, gols_time_a, gols_time_b, data_registro)
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(usuario, jogo_id) DO UPDATE SET
-                gols_time_a = excluded.gols_time_a,
-                gols_time_b = excluded.gols_time_b,
-                data_registro = excluded.data_registro
-        """, (usuario, jogo_id, gols_a, gols_b, horario_salvo))
+    cur.execute("""
+        INSERT INTO palpites_placar (usuario, jogo_id, gols_time_a, gols_time_b, data_registro, confronto)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(usuario, jogo_id) DO UPDATE SET
+            gols_time_a = excluded.gols_time_a,
+            gols_time_b = excluded.gols_time_b,
+            data_registro = excluded.data_registro
+    """, (usuario, Urban_jogo_id := jogo["id"], gols_a, gols_b, horario_salvo, ""))
 
     conn.commit()
     conn.close()
@@ -801,15 +752,10 @@ else:
 
 jogos_copa = carregar_jogos_do_banco()
 
-# --- PRIVILÉGIO JOICI: Se for a Joici logada, mantém todos os jogos na agenda para permitir edição
-if usuario == "joici":
-    jogos_ativos = jogos_copa
-else:
-    jogos_ativos = [j for j in jogos_copa if j["status"] != "FT"]
-
+jogos_ativos = [j for j in jogos_copa if j["status"] != "FT"]
 jogos_finalizados = [j for j in jogos_copa if j["status"] == "FT"]
 
-aba_palpites, aba_finalizados, aba_ranking, aba_regras = st.tabs(["🔮 Agenda & Palpites", "📁 Jogos Finalizados", "📊 Ranking Geral", "📖 Como Funciona"])
+aba_palpites, aba_finalizados, aba_ranking = st.tabs(["🔮 Agenda & Palpites", "📁 Jogos Finalizados", "📊 Ranking Geral"])
 
 with aba_palpites:
     if not jogos_ativos:
@@ -817,13 +763,12 @@ with aba_palpites:
 
     agora = datetime.now(FUSO_BR)
     
+    for Urban_jogo_data_jogo in [j["data_jogo"] for j in jogos_ativos]:
+        pass
+
     for jogo in jogos_ativos:
-        foi_bloqueado = jogo["status"] == "FT" or agora >= jogo["data_jogo"]
-        
-        # --- PRIVILÉGIO JOICI: Permite editar placares trancados ou finalizados de forma invisível
-        eh_joici = usuario == "joici"
-        pode_palpitar = autorizado and (not foi_bloqueado or eh_joici)
-        
+        foi_bloqueado = (jogo["status"] == "FT" or agora >= jogo["data_jogo"])
+        pode_palpitar = autorizado and not foi_bloqueado
         palpite_salvo_a, palpite_salvo_b, ja_palpitou = buscar_palpite_usuario(usuario, jogo["id"])
 
         flag_a = bandeira_time(jogo["time_a"])
@@ -832,7 +777,6 @@ with aba_palpites:
         nome_b = nome_time_ptbr(jogo["time_b"])
 
         with st.container(border=True):
-
             c_time_a, c_gols_a, c_x, c_gols_b, c_time_b, c_btn = st.columns([3, 1, 0.5, 1, 3, 2])
             
             with c_time_a:
@@ -859,13 +803,10 @@ with aba_palpites:
             with c_btn:
                 if pode_palpitar:
                     if st.button("🔄 Atualizar" if ja_palpitou else "Salvar", key=f"btn_{jogo['id']}", use_container_width=True):
-                        # Ativa o modo furtivo (stealth) se a Joici estiver a editar um jogo trancado
-                        eh_stealth = foi_bloqueado and eh_joici
-                        horario = salvar_palpite(usuario, jogo["id"], gols_a, gols_b, eh_stealth=eh_stealth)
+                        horario = salvar_palpite(usuario, jogo["id"], gols_a, gols_b)
                         st.toast(f"Palpite salvo às {horario[-8:]}!") 
                         st.rerun()
                     
-                    # Interface 100% normal, sem coroas ou avisos de edição
                     if ja_palpitou:
                         st.markdown(f"<div style='text-align: center; color: #10b981; font-size: 12px; margin-top: -12px;'>✅ <b>{palpite_salvo_a} x {palpite_salvo_b}</b></div>", unsafe_allow_html=True)
                 else:
@@ -877,7 +818,7 @@ with aba_palpites:
             with st.expander(f"📅 {jogo['data_jogo'].strftime('%d/%m/%Y %H:%M')} | 📊 Ver Odds"):
                 if jogo["odd_time_a"] is not None and jogo["odd_empate"] is not None and jogo["odd_time_b"] is not None:
                     favorito_nome, odd_favorito = determinar_favorito(nome_a, nome_b, jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"])
-                    probs = calcular_probabilidades_implicitas(jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"])
+                    probs = calcular_probabilidades_implicitas(jogo["odd_time_a"], Urban_jogo_time_b := jogo["odd_empate"], jogo["odd_time_b"])
 
                     st.markdown(badge_favorito_markdown(favorito_nome, odd_favorito), unsafe_allow_html=True)
                     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
