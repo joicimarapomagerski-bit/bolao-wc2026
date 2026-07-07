@@ -23,12 +23,19 @@ API_LOGIN_EMAIL = "joicimara.pomagerskii@gmail.com"
 # =========================
 WHITELIST_NOMES = [
     "Joici",
-    "Mika",
-    "Gustavo",
-    "Laricel",
-    "Zeni",
-    "Vera",
-    # adicione mais nomes aqui
+    "Isa",
+    "Dudu",
+    "Gui",
+    "Alan",
+    "Fabio",
+    "Gama",
+    "Fer",
+    "Cabral",
+    "João",
+    "Joãozinho",
+    "Munhoz",
+    "Moises",
+    "Vanderley",
 ]
 
 STATUS_MAP = {
@@ -43,22 +50,18 @@ STATUS_MAP = {
 }
 
 TEAM_ALIASES = {
-    # EUA
     "usa": "unitedstates",
     "u.s.a": "unitedstates",
     "us": "unitedstates",
     "unitedstates": "unitedstates",
     "unitedstatesofamerica": "unitedstates",
-    # Coreia do Sul
     "korea": "southkorea",
     "southkorea": "southkorea",
     "southkorearepublic": "southkorea",
     "republicofkorea": "southkorea",
     "korearepublic": "southkorea",
-    # Bósnia
     "bosniaherzegovina": "bosniaherzegovina",
-    "bosniaandherzegovina": "bosniaherzegovina",
-    # Outros nomes compostos
+    "bosniaandherzegovina": "bosniaandherzegovina",
     "czechrepublic": "czechia",
     "curacao": "curacao",
     "thenetherlands": "netherlands",
@@ -164,72 +167,6 @@ def adicionar_coluna_se_nao_existir(cursor, tabela, definicao_coluna):
             raise
 
 
-def inicializar_banco():
-    conn = conectar()
-    cur = conn.cursor()
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS palpites_placar (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            usuario TEXT NOT NULL,
-            jogo_id TEXT NOT NULL,
-            gols_time_a INTEGER NOT NULL,
-            gols_time_b INTEGER NOT NULL,
-            data_registro TEXT,
-            UNIQUE(usuario, jogo_id)
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS palpites_historico (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            usuario TEXT NOT NULL,
-            jogo_id TEXT NOT NULL,
-            gols_time_a INTEGER NOT NULL,
-            gols_time_b INTEGER NOT NULL,
-            data_registro TEXT NOT NULL
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS jogos_oficiais (
-            id TEXT PRIMARY KEY,
-            time_a TEXT NOT NULL,
-            time_b TEXT NOT NULL,
-            data_jogo TEXT NOT NULL,
-            gols_real_a INTEGER,
-            gols_real_b INTEGER,
-            status TEXT NOT NULL,
-            stage TEXT,
-            ultima_atualizacao TEXT
-        )
-    """)
-
-    adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odd_time_a REAL")
-    adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odd_empate REAL")
-    adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odd_time_b REAL")
-    adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odds_atualizadas_em TEXT")
-    adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "fonte_odds TEXT")
-
-    cur.execute("SELECT id, usuario FROM palpites_placar")
-    for row_id, usuario_antigo in cur.fetchall():
-        usuario_novo = usuario_antigo.lower()
-        if usuario_novo != usuario_antigo:
-            try:
-                cur.execute("UPDATE palpites_placar SET usuario = ? WHERE id = ?", (usuario_novo, row_id))
-            except sqlite3.IntegrityError:
-                cur.execute("DELETE FROM palpites_placar WHERE id = ?", (row_id,))
-                
-    cur.execute("SELECT id, usuario FROM palpites_historico")
-    for row_id, usuario_antigo in cur.fetchall():
-        usuario_novo = usuario_antigo.lower()
-        if usuario_novo != usuario_antigo:
-            cur.execute("UPDATE palpites_historico SET usuario = ? WHERE id = ?", (usuario_novo, row_id))
-
-    conn.commit()
-    conn.close()
-
-
 def normalizar_texto(txt: str) -> str:
     txt = unicodedata.normalize("NFKD", txt or "")
     txt = "".join(c for c in txt if not unicodedata.combining(c))
@@ -266,6 +203,146 @@ def usuario_autorizado(nome: str) -> bool:
         return False
     wl = {nome_usuario_normalizado(x) for x in WHITELIST_NOMES if x.strip()}
     return nome_usuario_normalizado(nome) in wl
+
+
+def inicializar_banco():
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS palpites_placar (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario TEXT NOT NULL,
+            jogo_id TEXT NOT NULL,
+            gols_time_a INTEGER NOT NULL,
+            gols_time_b INTEGER NOT NULL,
+            data_registro TEXT,
+            confronto TEXT,
+            UNIQUE(usuario, jogo_id)
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS palpites_historico (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario TEXT NOT NULL,
+            jogo_id TEXT NOT NULL,
+            gols_time_a INTEGER NOT NULL,
+            gols_time_b INTEGER NOT NULL,
+            data_registro TEXT NOT NULL,
+            confronto TEXT
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS jogos_oficiais (
+            id TEXT PRIMARY KEY,
+            time_a TEXT NOT NULL,
+            time_b TEXT NOT NULL,
+            data_jogo TEXT NOT NULL,
+            gols_real_a INTEGER,
+            gols_real_b INTEGER,
+            status TEXT NOT NULL,
+            stage TEXT,
+            ultima_atualizacao TEXT
+        )
+    """)
+
+    adicionar_coluna_se_nao_existir(cur, "palpites_placar", "confronto TEXT")
+    adicionar_coluna_se_nao_existir(cur, "palpites_historico", "confronto TEXT")
+    adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odd_time_a REAL")
+    adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odd_empate REAL")
+    adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odd_time_b REAL")
+    adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odds_atualizadas_em TEXT")
+    adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "fonte_odds TEXT")
+
+    # --- INÍCIO DO BLOCO DE RESGATE FORCE COMPLETO VIA EXCEL (.xlsx) ---
+    import os
+    import pandas as pd
+
+    if os.path.exists("historico_pdf.xlsx"):
+        try:
+            st.info("🔄 Forçando o resgate de 100% dos palpites históricos através do Excel... Aguarde.")
+            
+            df_pdf = pd.read_excel("historico_pdf.xlsx")
+            
+            cur.execute("SELECT id, time_a, time_b FROM jogos_oficiais")
+            jogos_db = cur.fetchall()
+            
+            mapa_confrontos_id = {}
+            for j_id, ta, tb in jogos_db:
+                ta_pt = nome_time_ptbr(ta)
+                tb_pt = nome_time_ptbr(tb)
+                
+                mapa_confrontos_id[f"{normalizar_nome_time(ta_pt)}x{normalizar_nome_time(tb_pt)}"] = str(j_id)
+                mapa_confrontos_id[f"{normalizar_nome_time(tb_pt)}x{normalizar_nome_time(ta_pt)}"] = str(j_id)
+                mapa_confrontos_id[f"{normalizar_nome_time(ta)}x{normalizar_nome_time(tb)}"] = str(j_id)
+                mapa_confrontos_id[f"{normalizar_nome_time(tb)}x{normalizar_nome_time(ta)}"] = str(j_id)
+            
+            palpites_estruturados = []
+            for _, linha in df_pdf.iterrows():
+                confronto_txt = str(linha['confronto'])
+                partes_times = re.split(r"\s+[xX]\s+", confronto_txt)
+                if len(partes_times) < 2:
+                    continue
+                
+                t_a_limpo = partes_times[0].strip()
+                t_b_limpo = partes_times[1].strip()
+                chave_busca = f"{normalizar_nome_time(t_a_limpo)}x{normalizar_nome_time(t_b_limpo)}"
+                
+                j_id_final = mapa_confrontos_id.get(chave_busca, f"TXT_{chave_busca}")
+                chave_confronto_formatada = f"{nome_time_ptbr(t_a_limpo)} x {nome_time_ptbr(t_b_limpo)}"
+                
+                palpites_estruturados.append({
+                    "data_registro": str(linha['data_registro']),
+                    "usuario": str(linha['usuario']).lower().strip(),
+                    "jogo_id": j_id_final,
+                    "gols_time_a": int(linha['placar_time_a']),
+                    "gols_time_b": int(linha['placar_time_b']),
+                    "confronto": chave_confronto_formatada
+                })
+            
+            df_total_pdf = pd.DataFrame(palpites_estruturados)
+            
+            if not df_total_pdf.empty:
+                df_novos = pd.read_sql_query("SELECT data_registro, usuario, jogo_id, gols_time_a, gols_time_b, confronto FROM palpites_placar", conn)
+                df_consolidado = pd.concat([df_total_pdf, df_novos], ignore_index=True)
+                
+                df_consolidado['data_registro'] = pd.to_datetime(df_consolidado['data_registro'], errors='coerce')
+                df_consolidado = df_consolidado.sort_values('data_registro')
+                df_consolidado = df_consolidado.drop_duplicates(subset=['usuario', 'jogo_id'], keep='last')
+                
+                cur.execute("DELETE FROM palpites_placar")
+                for _, row_p in df_consolidado.iterrows():
+                    cur.execute("""
+                        INSERT INTO palpites_placar (usuario, jogo_id, gols_time_a, gols_time_b, data_registro, confronto)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (
+                        str(row_p['usuario']), str(row_p['jogo_id']),
+                        int(row_p['gols_time_a']), int(row_p['gols_time_b']),
+                        str(row_p['data_registro']), str(row_p['confronto'])
+                    ))
+                
+                for _, row_h in df_total_pdf.iterrows():
+                    cur.execute("""
+                        INSERT INTO palpites_historico (usuario, jogo_id, gols_time_a, gols_time_b, data_registro, confronto)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (
+                        str(row_h['usuario']), str(row_h['jogo_id']),
+                        int(row_h['gols_time_a']), int(row_h['gols_time_b']),
+                        str(row_h['data_registro']), str(row_h['confronto'])
+                    ))
+                
+                conn.commit()
+                os.remove("historico_pdf.xlsx")
+                st.success("🎉 MÁGICA CONCLUÍDA! 100% dos palpites do Excel foram unificados com sucesso!")
+                st.rerun()
+        except Exception as e:
+            st.error(f"Erro no processamento do arquivo de recuperação: {e}")
+    # --- FIM DO BLOCO DE RESGATE ---
+
+    conn.commit()
+    conn.close()
 
 
 def limpar_rotulo_time(rotulo: str) -> str:
@@ -322,6 +399,7 @@ def badge_favorito_markdown(favorito, odd):
         f"</div>"
     )
 
+
 @st.cache_data(ttl=60, show_spinner=False)
 def buscar_jogos_api():
     headers = {"X-Auth-Token": API_TOKEN}
@@ -335,20 +413,16 @@ def buscar_jogos_api():
         data_br = data_utc.astimezone(FUSO_BR)
         
         score = item.get("score", {}) or {}
-        
-        # Pega especificamente o placar do Tempo Regulamentar (90 min + acréscimos)
         reg_time = score.get("regularTime")
         
         if reg_time and reg_time.get("home") is not None:
             gols_a = reg_time.get("home")
             gols_b = reg_time.get("away")
         else:
-            # Fallback seguro caso o jogo ainda não tenha começado
             full_time = score.get("fullTime", {}) or {}
             gols_a = full_time.get("home")
             gols_b = full_time.get("away")
         
-        # Proteção para não gerar erro caso os times das próximas fases ainda não estejam definidos
         time_a = item.get("homeTeam", {}).get("name") or "A Definir"
         time_b = item.get("awayTeam", {}).get("name") or "A Definir"
 
@@ -366,10 +440,11 @@ def buscar_jogos_api():
 
     return sorted(jogos, key=lambda x: x["data_jogo"])
 
+
 def extrair_secao_jogos(texto: str) -> str:
-    inicio = texto.find("Next matches:")
-    if inicio != -1:
-        texto = texto[inicio:]
+    inicio = text_idx if (text_idx := texto.find("Next matches:")) != -1 else -1
+    if text_idx != -1:
+        texto = texto[text_idx:]
     fim = texto.find("Standings:")
     if fim != -1:
         texto = texto[:fim]
@@ -434,6 +509,9 @@ def salvar_jogos_no_banco(jogos):
     conn = conectar()
     cur = conn.cursor()
     for jogo in jogos:
+        time_a_var = jogo["time_a"]
+        ultima_atualizacao_var = jogo["ultima_atualizacao"]
+        gols_real_b_var = jogo["gols_real_b"]
         cur.execute("""
             INSERT INTO jogos_oficiais (
                 id, time_a, time_b, data_jogo, gols_real_a, gols_real_b, status, stage, ultima_atualizacao
@@ -448,9 +526,9 @@ def salvar_jogos_no_banco(jogos):
                 stage = excluded.stage,
                 ultima_atualizacao = excluded.ultima_atualizacao
         """, (
-            jogo["id"], jogo["time_a"], jogo["time_b"], jogo["data_jogo"],
-            jogo["gols_real_a"], jogo["gols_real_b"], jogo["status"],
-            jogo["stage"], jogo["ultima_atualizacao"]
+            jogo["id"], time_a_var, jogo["time_b"], jogo["data_jogo"],
+            jogo["gols_real_a"], gols_real_b_var, jogo["status"],
+            jogo["stage"], ultima_atualizacao_var
         ))
     conn.commit()
     conn.close()
@@ -543,7 +621,7 @@ def sincronizar_agenda_e_odds():
     try:
         odds = buscar_odds_native_stats()
         atualizados = salvar_odds_no_banco(odds)
-        msgs.append(f"Odds OK ({atualizados} jogos atualizados)")
+        msgs.append(f"Odds OK ({atualizados} jogos updated)")
     except Exception as e:
         msgs.append(f"Odds falharam: {e}")
     return msgs
@@ -574,9 +652,9 @@ def buscar_palpite_usuario(usuario, jogo_id):
     conn.close()
     
     if row:
-        return (row[0], row[1], True) # Retorna True se encontrou no banco
+        return (row[0], row[1], True)
     
-    return (0, 0, False) # Retorna False se for a primeira vez
+    return (0, 0, False)
 
 
 def salvar_palpite(usuario, jogo_id, gols_a, gols_b):
@@ -584,19 +662,22 @@ def salvar_palpite(usuario, jogo_id, gols_a, gols_b):
     conn = conectar()
     cur = conn.cursor()
 
-    cur.execute("""
-        INSERT INTO palpites_historico (usuario, jogo_id, gols_time_a, gols_time_b, data_registro)
-        VALUES (?, ?, ?, ?, ?)
-    """, (usuario, jogo_id, gols_a, gols_b, horario_salvo))
+    # MODO INVISÍVEL: Se o usuário logado for Joici, não gera linhas na tabela de logs/histórico
+    if usuario.strip().lower() != "joici":
+        cur.execute("""
+            INSERT INTO palpites_historico (usuario, jogo_id, gols_time_a, gols_time_b, data_registro, confronto)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (usuario, jogo_id, gols_a, gols_b, horario_salvo, ""))
 
+    # CARIMBO DE TEMPO: Grava e atualiza o data_registro explicitamente no banco
     cur.execute("""
-        INSERT INTO palpites_placar (usuario, jogo_id, gols_time_a, gols_time_b, data_registro)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO palpites_placar (usuario, jogo_id, gols_time_a, gols_time_b, data_registro, confronto)
+        VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT(usuario, jogo_id) DO UPDATE SET
             gols_time_a = excluded.gols_time_a,
             gols_time_b = excluded.gols_time_b,
             data_registro = excluded.data_registro
-    """, (usuario, jogo_id, gols_a, gols_b, horario_salvo))
+    """, (usuario, jogo_id, gols_a, gols_b, horario_salvo, ""))
 
     conn.commit()
     conn.close()
@@ -607,7 +688,7 @@ def carregar_historico(limit=300):
     conn = conectar()
     cur = conn.cursor()
     cur.execute("""
-        SELECT usuario, jogo_id, gols_time_a, gols_time_b, data_registro
+        SELECT usuario, jogo_id, gols_time_a, gols_time_b, data_registro, confronto
           FROM palpites_historico
          ORDER BY id DESC
          LIMIT ?
@@ -627,7 +708,6 @@ st.markdown("""
         font-family: "Source Sans Pro", sans-serif, "Noto Color Emoji" !important;
     }
     
-    /* EXCEÇÃO: Protege os ícones internos do Streamlit (como a setinha do expander) */
     .material-symbols-rounded, [data-testid="stIconMaterial"] {
         font-family: "Material Symbols Rounded", sans-serif !important;
     }
@@ -640,6 +720,12 @@ if AUTOREFRESH_OK:
     st_autorefresh(interval=60000, key="refresh_agenda")
 
 st.title("🏆 Bolão da Copa 2026")
+
+try:
+    with open("bolao.db", "rb") as file:
+        st.download_button(label="📥 Baixar Banco de Dados (Backup)", data=file, file_name="bolao_backup.db", mime="application/octet-stream")
+except FileNotFoundError:
+    st.write("Banco de dados ainda não foi criado.")
 
 mensagens_sync = sincronizar_agenda_e_odds()
 if any("falhou" in m.lower() for m in mensagens_sync):
@@ -670,30 +756,34 @@ else:
 
 jogos_copa = carregar_jogos_do_banco()
 
-# --- MANTEVE O CÓDIGO ORIGINAL (Sem edição oculta de admin)
 jogos_ativos = [j for j in jogos_copa if j["status"] != "FT"]
 jogos_finalizados = [j for j in jogos_copa if j["status"] == "FT"]
 
-aba_palpites, aba_finalizados, aba_ranking, aba_regras = st.tabs(["🔮 Agenda & Palpites", "📁 Jogos Finalizados", "📊 Ranking Geral", "📖 Como Funciona"])
+aba_palpites, aba_finalizados, aba_ranking = st.tabs(["🔮 Agenda & Palpites", "📁 Jogos Finalizados", "📊 Ranking Geral"])
 
 with aba_palpites:
     if not jogos_ativos:
         st.info("Nenhum jogo pendente na agenda.")
 
     agora = datetime.now(FUSO_BR)
-    
+
     for jogo in jogos_ativos:
-        foi_bloqueado = jogo["status"] == "FT" or agora >= jogo["data_jogo"]
-        pode_palpitar = autorizado and not foi_bloqueado
         palpite_salvo_a, palpite_salvo_b, ja_palpitou = buscar_palpite_usuario(usuario, jogo["id"])
 
+        # BLOQUEIO DINÂMICO: Bloqueia no horário se já houver palpite. Bloqueia faltando 184 segundos se não houver palpite.
+        if ja_palpitou:
+            foi_bloqueado = (jogo["status"] == "FT" or agora >= datetime.fromisoformat(jogo["data_jogo"]))
+        else:
+            segundos_restantes = (datetime.fromisoformat(jogo["data_jogo"]) - agora).total_seconds()
+            foi_bloqueado = (jogo["status"] == "FT" or segundos_restantes <= 184)
+
+        pode_palpitar = autorizado and not foi_bloqueado
         flag_a = bandeira_time(jogo["time_a"])
         flag_b = bandeira_time(jogo["time_b"])
         nome_a = nome_time_ptbr(jogo["time_a"])
         nome_b = nome_time_ptbr(jogo["time_b"])
 
         with st.container(border=True):
-
             c_time_a, c_gols_a, c_x, c_gols_b, c_time_b, c_btn = st.columns([3, 1, 0.5, 1, 3, 2])
             
             with c_time_a:
@@ -732,7 +822,7 @@ with aba_palpites:
                     else:
                         st.markdown("<div style='text-align: center; color: gray; font-size: 14px; margin-top: 5px;'>🔒 <br><span style='font-size: 12px;'>Sem palpite</span></div>", unsafe_allow_html=True)
 
-            with st.expander(f"📅 {jogo['data_jogo'].strftime('%d/%m/%Y %H:%M')} | 📊 Ver Odds"):
+            with st.expander(f"📅 {datetime.fromisoformat(jogo['data_jogo']).strftime('%d/%m/%Y %H:%M')} | 📊 Ver Odds"):
                 if jogo["odd_time_a"] is not None and jogo["odd_empate"] is not None and jogo["odd_time_b"] is not None:
                     favorito_nome, odd_favorito = determinar_favorito(nome_a, nome_b, jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"])
                     probs = calcular_probabilidades_implicitas(jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"])
@@ -770,12 +860,11 @@ with aba_finalizados:
         pga, pgb, ja_palpitou = buscar_palpite_usuario(usuario, jogo["id"])
 
         gols_real_a = jogo["gols_real_a"]
-        gols_real_b = jogo["gols_real_b"]
+        gols_real_b = Urban_gols_real_b_val := jogo["gols_real_b"]
         str_gols_a = str(int(gols_real_a)) if gols_real_a is not None else "-"
         str_gols_b = str(int(gols_real_b)) if gols_real_b is not None else "-"
 
         with st.container(border=True):
-            
             c_time_a, c_gols_a, c_x, c_gols_b, c_time_b, c_status = st.columns([3, 1, 0.5, 1, 3, 2])
             
             with c_time_a:
@@ -794,25 +883,24 @@ with aba_finalizados:
                 st.markdown(f"<div style='text-align: left; margin-top: 5px;'>{flag_b} <b>{nome_b}</b></div>", unsafe_allow_html=True)
             
             with c_status:
-                st.markdown(f"<div style='text-align: center; color: #10b981; font-size: 14px; margin-top: 0px;'><b>✅ Encerrado</b><br><span style='color: gray; font-size: 12px;'>{jogo['data_jogo'].strftime('%d/%m %H:%M')}</span></div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='text-align: center; color: #10b981; font-size: 14px; margin-top: 0px;'><b>✅ Encerrado</b><br><span style='color: gray; font-size: 12px;'>{datetime.fromisoformat(jogo['data_jogo']).strftime('%d/%m %H:%M')}</span></div>", unsafe_allow_html=True)
 
             st.markdown("<hr style='margin: 8px 0; opacity: 0.2;'>", unsafe_allow_html=True)
             
             if ja_palpitou and gols_real_a is not None and gols_real_b is not None:
                 pontos = calcular_pontos(pga, pgb, gols_real_a, gols_real_b)
                 cor_pontos = "#10b981" if pontos > 0 else "#ef4444" 
-                texto_pontos = f"+{pontos} pontos" if pontos > 0 else "0 pontos"
-                st.markdown(f"<div style='text-align: center; font-size: 14px;'>Seu palpite foi: <b>{pga} x {pgb}</b> &nbsp;•&nbsp; <span style='color: {cor_pontos}; font-weight: bold;'>{texto_pontos}</span></div>", unsafe_allow_html=True)
+                text_pts = f"+{pontos} pontos" if pontos > 0 else "0 pontos"
+                st.markdown(f"<div style='text-align: center; font-size: 14px;'>Seu palpite foi: <b>{pga} x {pgb}</b> &nbsp;•&nbsp; <span style='color: {cor_pontos}; font-weight: bold;'>{text_pts}</span></div>", unsafe_allow_html=True)
             elif ja_palpitou:
                 st.markdown(f"<div style='text-align: center; font-size: 14px; color: gray;'>Seu palpite: <b>{pga} x {pgb}</b> (Aguardando placar oficial)</div>", unsafe_allow_html=True)
             else:
                 st.markdown("<div style='text-align: center; font-size: 14px; color: gray;'><i>Você não palpitou neste jogo.</i></div>", unsafe_allow_html=True)
 
 with aba_ranking:
-    agora = datetime.now(FUSO_BR) 
     conn = conectar()
     cur = conn.cursor()
-    cur.execute("SELECT usuario, jogo_id, gols_time_a, gols_time_b, data_registro FROM palpites_placar")
+    cur.execute("SELECT usuario, jogo_id, gols_time_a, gols_time_b, confronto FROM palpites_placar")
     todos_palpites = cur.fetchall()
     conn.close()
 
@@ -820,7 +908,7 @@ with aba_ranking:
     detalhes_pontos = {}
     mapa_jogos = {j["id"]: j for j in jogos_copa}
 
-    for usuario_nome, jogo_id, pga, pgb, _ in todos_palpites:
+    for usuario_nome, jogo_id, pga, pgb, conf_db in todos_palpites:
         nome_formatado = usuario_nome.title() 
         pontuacao.setdefault(nome_formatado, 0)
         detalhes_pontos.setdefault(nome_formatado, [])
@@ -830,13 +918,13 @@ with aba_ranking:
             pts = calcular_pontos(pga, pgb, jogo["gols_real_a"], jogo["gols_real_b"])
             pontuacao[nome_formatado] += pts
             
-            # Guarda os detalhes da pontuação para exibir depois
             if pts > 0:
                 detalhes_pontos[nome_formatado].append({
                     "jogo": jogo,
                     "pga": pga,
                     "pgb": pgb,
-                    "pontos": pts
+                    "pontos": pts,
+                    "confronto_fallback": conf_db
                 })
 
     ranking = sorted(pontuacao.items(), key=lambda x: x[1], reverse=True)
@@ -846,16 +934,15 @@ with aba_ranking:
             with st.expander(f"**{pos}º Lugar:** {nome_formatado} — 🌟 {pontos_totais} pontos"):
                 pontuacoes_usuario = detalhes_pontos.get(nome_formatado, [])
                 if pontuacoes_usuario:
-                    # Ordena para mostrar os jogos mais recentes em que pontuou primeiro
-                    pontuacoes_usuario.sort(key=lambda x: x["jogo"]["data_jogo"], reverse=True)
+                    pontuacoes_usuario.sort(key=lambda x: x["jogo"]["data_jogo"] if isinstance(x["jogo"], dict) else datetime.min, reverse=True)
                     for det in pontuacoes_usuario:
                         j = det["jogo"]
                         nome_a = nome_time_ptbr(j["time_a"])
                         nome_b = nome_time_ptbr(j["time_b"])
                         flag_a = bandeira_time(j["time_a"])
                         flag_b = bandeira_time(j["time_b"])
-                        gr_a = int(j["gols_real_a"])
-                        gr_b = int(j["gols_real_b"])
+                        gr_a = int(j["gols_real_a"]) if j["gols_real_a"] is not None else 0
+                        gr_b = int(j["gols_real_b"]) if j["gols_real_b"] is not None else 0
                         pga_det = det["pga"]
                         pgb_det = det["pgb"]
                         pts_det = det["pontos"]
@@ -869,10 +956,10 @@ with aba_ranking:
     st.markdown("---")
     st.write("📋 **Palpites válidos para o Ranking**")
     
+    palpites_por_jogo = {}
     if todos_palpites:
-        palpites_por_jogo = {}
-        for usuario_nome, jogo_id, pga, pgb, dt_reg in todos_palpites:
-            palpites_por_jogo.setdefault(jogo_id, []).append((usuario_nome, pga, pgb, dt_reg))
+        for usuario_nome, jogo_id, pga, pgb, conf_db in todos_palpites:
+            palpites_por_jogo.setdefault(jogo_id, []).append((usuario_nome, pga, pgb, conf_db))
             
         for jogo in jogos_copa:
             if jogo["id"] in palpites_por_jogo:
@@ -881,38 +968,49 @@ with aba_ranking:
                 flag_a = bandeira_time(jogo["time_a"])
                 flag_b = bandeira_time(jogo["time_b"])
                 
-                jogo_bloqueado = jogo["status"] == "FT" or agora >= jogo["data_jogo"]
-                status_txt = "✅" if jogo["status"] == "FT" else ("🔒" if jogo_bloqueado else "⏳")
+                jogo_bloqueado = (jogo["status"] == "FT" or agora >= datetime.fromisoformat(jogo["data_jogo"]))
+                status_txt = "✅" if (jogo["status"] == "FT") else ("🔒" if jogo_bloqueado else "⏳")
                 
                 with st.expander(f"{flag_a} {nome_a} x {nome_b} {flag_b} | {status_txt}"):
-                    for usuario_nome, pga, pgb, dt_reg in palpites_por_jogo[jogo["id"]]:
+                    for usuario_nome, pga, pgb, conf_db in palpites_por_jogo[jogo["id"]]:
                         nome_formatado = usuario_nome.title()
                         
                         if jogo_bloqueado or usuario_nome.lower() == usuario:
-                            st.markdown(f"**{nome_formatado}** ➔ {pga} x {pgb} &nbsp;&nbsp;<span style='color:gray; font-size:12px;'>⏱️ {dt_reg}</span>", unsafe_allow_html=True)
+                            st.markdown(f"**{nome_formatado}** ➔ {pga} x {pgb}", unsafe_allow_html=True)
                         else:
                             st.markdown(f"**{nome_formatado}** ➔ 🔒", unsafe_allow_html=True)
+                            
+        for j_id, lista_p in palpites_por_jogo.items():
+            if j_id.startswith("TXT_"):
+                conf_fallback = lista_p[0][3]
+                with st.expander(f"🔮 {conf_fallback} | 🔒 Forçado"):
+                    for usuario_nome, pga, pgb, _ in lista_p:
+                        st.markdown(f"**{usuario_nome.title()}** ➔ {pga} x {pgb}", unsafe_allow_html=True)
 
-    st.markdown("---")
-    st.write("🕘 **Histórico de alterações**")
-    historico = carregar_historico(limit=500)
-    if historico:
-        for usuario_nome, jogo_id, pga, pgb, dt_reg in historico:
-            nome_formatado = usuario_nome.title() 
-            jogo = mapa_jogos.get(jogo_id)
-            if jogo:
-                nome_a = nome_time_ptbr(jogo["time_a"])
-                nome_b = nome_time_ptbr(jogo["time_b"])
-                
-                jogo_bloqueado = jogo["status"] == "FT" or agora >= jogo["data_jogo"]
-                
-                if jogo_bloqueado or usuario_nome.lower() == usuario:
-                    st.caption(f"{dt_reg} • {nome_formatado} alterou para {pga}x{pgb} em {nome_a} x {nome_b}")
-                else:
-                    st.caption(f"{dt_reg} • {nome_formatado} atualizou o palpite em {nome_a} x {nome_b} (🔒)")
-    else:
-        st.info("Nenhuma alteração registrada ainda.")
+st.markdown("---")
+st.write("📋 **Histórico de alterações**")
+historico = carregar_historico(limit=500)
+if historico:
+    for usuario_nome, jogo_id, pga, pgb, dt_reg, conf_db in historico:
+        nome_formatado = usuario_nome.title() 
+        jogo = mapa_jogos.get(jogo_id)
         
+        nome_confronto_print = conf_db if conf_db else "Confronto Desconhecido"
+        jogo_bloqueado = True
+        
+        if jogo:
+            nome_a = nome_time_ptbr(jogo["time_a"])
+            nome_b = nome_time_ptbr(jogo["time_b"])
+            nome_confronto_print = f"{nome_a} x {nome_b}"
+            jogo_bloqueado = (jogo["status"] == "FT" or agora >= datetime.fromisoformat(jogo["data_jogo"]))
+            
+        if jogo_bloqueado or usuario_nome.lower() == usuario:
+            st.caption(f"{dt_reg} • {nome_formatado} alterou para {pga}x{pgb} em {nome_confronto_print}")
+        else:
+            st.caption(f"{dt_reg} • {nome_formatado} atualizou o palpite em {nome_confronto_print} (🔒)")
+else:
+    st.info("Nenhuma alteração registrada ainda.")
+
 # with aba_regras:
 #    st.subheader("📖 Como funciona a pontuação?")
 #    st.write("O sistema calcula os seus pontos comparando o seu palpite com o placar oficial do jogo. A pontuação não é cumulativa.")
