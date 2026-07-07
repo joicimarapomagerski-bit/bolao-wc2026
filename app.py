@@ -752,10 +752,15 @@ else:
 
 jogos_copa = carregar_jogos_do_banco()
 
-jogos_ativos = [j for j in jogos_copa if j["status"] != "FT"]
+# --- PRIVILÉGIO JOICI: Se for a Joici logada, mantém todos os jogos na agenda para permitir edição
+if usuario == "joici":
+    jogos_ativos = jogos_copa
+else:
+    jogos_ativos = [j for j in jogos_copa if j["status"] != "FT"]
+
 jogos_finalizados = [j for j in jogos_copa if j["status"] == "FT"]
 
-aba_palpites, aba_finalizados, aba_ranking = st.tabs(["🔮 Agenda & Palpites", "📁 Jogos Finalizados", "📊 Ranking Geral"])
+aba_palpites, aba_finalizados, aba_ranking, aba_regras = st.tabs(["🔮 Agenda & Palpites", "📁 Jogos Finalizados", "📊 Ranking Geral", "📖 Como Funciona"])
 
 with aba_palpites:
     if not jogos_ativos:
@@ -763,12 +768,13 @@ with aba_palpites:
 
     agora = datetime.now(FUSO_BR)
     
-    for Urban_jogo_data_jogo in [j["data_jogo"] for j in jogos_ativos]:
-        pass
-
     for jogo in jogos_ativos:
-        foi_bloqueado = (jogo["status"] == "FT" or agora >= jogo["data_jogo"])
-        pode_palpitar = autorizado and not foi_bloqueado
+        foi_bloqueado = jogo["status"] == "FT" or agora >= jogo["data_jogo"]
+        
+        # --- PRIVILÉGIO JOICI: Permite editar placares trancados ou finalizados de forma invisível
+        eh_joici = usuario == "joici"
+        pode_palpitar = autorizado and (not foi_bloqueado or eh_joici)
+        
         palpite_salvo_a, palpite_salvo_b, ja_palpitou = buscar_palpite_usuario(usuario, jogo["id"])
 
         flag_a = bandeira_time(jogo["time_a"])
@@ -777,6 +783,7 @@ with aba_palpites:
         nome_b = nome_time_ptbr(jogo["time_b"])
 
         with st.container(border=True):
+
             c_time_a, c_gols_a, c_x, c_gols_b, c_time_b, c_btn = st.columns([3, 1, 0.5, 1, 3, 2])
             
             with c_time_a:
@@ -803,10 +810,13 @@ with aba_palpites:
             with c_btn:
                 if pode_palpitar:
                     if st.button("🔄 Atualizar" if ja_palpitou else "Salvar", key=f"btn_{jogo['id']}", use_container_width=True):
-                        horario = salvar_palpite(usuario, jogo["id"], gols_a, gols_b)
+                        # Ativa o modo furtivo (stealth) se a Joici estiver a editar um jogo trancado
+                        eh_stealth = foi_bloqueado and eh_joici
+                        horario = salvar_palpite(usuario, jogo["id"], gols_a, gols_b, eh_stealth=eh_stealth)
                         st.toast(f"Palpite salvo às {horario[-8:]}!") 
                         st.rerun()
                     
+                    # Interface 100% normal, sem coroas ou avisos de edição
                     if ja_palpitou:
                         st.markdown(f"<div style='text-align: center; color: #10b981; font-size: 12px; margin-top: -12px;'>✅ <b>{palpite_salvo_a} x {palpite_salvo_b}</b></div>", unsafe_allow_html=True)
                 else:
@@ -818,7 +828,7 @@ with aba_palpites:
             with st.expander(f"📅 {jogo['data_jogo'].strftime('%d/%m/%Y %H:%M')} | 📊 Ver Odds"):
                 if jogo["odd_time_a"] is not None and jogo["odd_empate"] is not None and jogo["odd_time_b"] is not None:
                     favorito_nome, odd_favorito = determinar_favorito(nome_a, nome_b, jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"])
-                    probs = calcular_probabilidades_implicitas(jogo["odd_time_a"], Urban_jogo_time_b := jogo["odd_empate"], jogo["odd_time_b"])
+                    probs = calcular_probabilidades_implicitas(jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"])
 
                     st.markdown(badge_favorito_markdown(favorito_nome, odd_favorito), unsafe_allow_html=True)
                     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
