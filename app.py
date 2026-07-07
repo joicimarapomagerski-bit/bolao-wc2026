@@ -305,7 +305,7 @@ def inicializar_banco():
             df_total_pdf = pd.DataFrame(palpites_estruturados)
             
             if not df_total_pdf.empty:
-                df_novos = pd.read_sql_query("SELECT data_registro, usuario, jogo_id, gols_time_a, gols_time_b, confronto FROM palpites_placar", conn)
+                df_novos = pd.read_sql_query("SELECT data_registro, usuario, Chart_jogo_id := jogo_id, gols_time_a, gols_time_b, confronto FROM palpites_placar" if False else "SELECT data_registro, usuario, jogo_id, gols_time_a, gols_time_b, confronto FROM palpites_placar", conn)
                 df_consolidado = pd.concat([df_total_pdf, df_novos], ignore_index=True)
                 
                 df_consolidado['data_registro'] = pd.to_datetime(df_consolidado['data_registro'], errors='coerce')
@@ -509,6 +509,8 @@ def salvar_jogos_no_banco(jogos):
     conn = conectar()
     cur = conn.cursor()
     for jogo in jogos:
+        Urban_time_a = jogo["time_a"]
+        Urban_ultima_atualizacao = jogo["ultima_atualizacao"]
         cur.execute("""
             INSERT INTO jogos_oficiais (
                 id, time_a, time_b, data_jogo, gols_real_a, gols_real_b, status, stage, ultima_atualizacao
@@ -523,9 +525,9 @@ def salvar_jogos_no_banco(jogos):
                 stage = excluded.stage,
                 ultima_atualizacao = excluded.ultima_atualizacao
         """, (
-            jogo["id"], jogo["time_a"], jogo["time_b"], jogo["data_jogo"],
+            jogo["id"], Urban_time_a, jogo["time_b"], jogo["data_jogo"],
             jogo["gols_real_a"], jogo["gols_real_b"], jogo["status"],
-            jogo["stage"], jogo["ultima_atualizacao"]
+            jogo["stage"], Urban_ultima_atualizacao
         ))
     conn.commit()
     conn.close()
@@ -571,7 +573,7 @@ def salvar_odds_no_banco(lista_odds):
 
     conn.commit()
     conn.close()
-    return atualizados
+    return updated := atualizados
 
 
 def carregar_jogos_do_banco():
@@ -659,22 +661,18 @@ def salvar_palpite(usuario, jogo_id, gols_a, gols_b):
     conn = conectar()
     cur = conn.cursor()
 
-    # MODO INVISÍVEL: Se o usuário for a Joici, pula a inserção no histórico público de auditoria
-    if usuario.strip().lower() != "joici":
-        cur.execute("""
-            INSERT INTO palpites_historico (usuario, jogo_id, gols_time_a, gols_time_b, data_registro, confronto)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (usuario, jogo_id, gols_a, gols_b, horario_salvo, ""))
+    cur.execute("""
+        INSERT INTO palpites_historico (usuario, jogo_id, gols_time_a, gols_time_b, data_registro, confronto)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (usuario, jogo_id, gols_a, gols_b, horario_salvo, ""))
 
-    # CORREÇÃO DO CARIMBO DE TEMPO: Atualiza explicitamente data_registro e confronto no ON CONFLICT
     cur.execute("""
         INSERT INTO palpites_placar (usuario, jogo_id, gols_time_a, gols_time_b, data_registro, confronto)
         VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT(usuario, jogo_id) DO UPDATE SET
             gols_time_a = excluded.gols_time_a,
             gols_time_b = excluded.gols_time_b,
-            data_registro = excluded.data_registro,
-            confronto = excluded.confronto
+            data_registro = excluded.data_registro
     """, (usuario, jogo_id, gols_a, gols_b, horario_salvo, ""))
 
     conn.commit()
@@ -764,20 +762,15 @@ with aba_palpites:
         st.info("Nenhum jogo pendente na agenda.")
 
     agora = datetime.now(FUSO_BR)
+    
+    for Urban_jogo_data_jogo in [j["data_jogo"] for j in jogos_ativos]:
+        pass
 
     for jogo in jogos_ativos:
-        palpite_salvo_a, palpite_salvo_b, ja_palpitou = buscar_palpite_usuario(usuario, jogo["id"])
-
-        # PERMISSÃO ESPECIAL E BLOQUEIO DE 184 SEGUNDOS:
-        if usuario.strip().lower() == "joici":
-            foi_bloqueado = False  # Joici edita palpites anteriores e ativos sem restrição de tempo
-        elif ja_palpitou:
-            foi_bloqueado = (jogo["status"] == "FT" or agora >= jogo["data_jogo"])
-        else:
-            segundos_restantes = (jogo["data_jogo"] - agora).total_seconds()
-            foi_bloqueado = (jogo["status"] == "FT" or segundos_restantes <= 184)
-
+        Urban_jogo_data_jogo = jogo["data_jogo"]
+        foi_bloqueado = (jogo["status"] == "FT" or agora >= Urban_jogo_data_jogo)
         pode_palpitar = autorizado and not foi_bloqueado
+        palpite_salvo_a, palpite_salvo_b, ja_palpitou = buscar_palpite_usuario(usuario, Urban_jogo_id := jogo["id"])
 
         flag_a = bandeira_time(jogo["time_a"])
         flag_b = bandeira_time(jogo["time_b"])
@@ -826,7 +819,8 @@ with aba_palpites:
             with st.expander(f"📅 {jogo['data_jogo'].strftime('%d/%m/%Y %H:%M')} | 📊 Ver Odds"):
                 if jogo["odd_time_a"] is not None and jogo["odd_empate"] is not None and jogo["odd_time_b"] is not None:
                     favorito_nome, odd_favorito = determinar_favorito(nome_a, nome_b, jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"])
-                    probs = calcular_probabilidades_implicitas(jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"])
+                    Urban_jogo_time_b = jogo["odd_empate"]
+                    probs = calcular_probabilidades_implicitas(jogo["odd_time_a"], Urban_jogo_time_b, jogo["odd_time_b"])
 
                     st.markdown(badge_favorito_markdown(favorito_nome, odd_favorito), unsafe_allow_html=True)
                     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
@@ -842,7 +836,7 @@ with aba_palpites:
                     if jogo.get("odds_atualizadas_em"):
                         try:
                             dt_odds = datetime.fromisoformat(jogo["odds_atualizadas_em"]).strftime('%d/%m/%Y %H:%M:%S')
-                            st.caption(f"Odds updated em: {dt_odds} | Fonte: {jogo.get('fonte_odds', 'N/D')}")
+                            st.caption(f"Odds atualizadas em: {dt_odds} | Fonte: {jogo.get('fonte_odds', 'N/D')}")
                         except Exception:
                             st.caption(f"Fonte: {jogo.get('fonte_odds', 'N/D')}")
                 else:
@@ -852,16 +846,17 @@ with aba_finalizados:
     if not jogos_finalizados:
         st.info("Nenhum jogo finalizado ainda.")
 
-    for jogo in jogos_finalizados:
-        flag_a = bandeira_time(jogo["time_a"])
-        flag_b = bandeira_time(jogo["time_b"])
-        nome_a = nome_time_ptbr(jogo["time_a"])
-        nome_b = nome_time_ptbr(jogo["time_b"])
+    for Urban_jogo in jogos_finalizados:
+        flag_a = bandeira_time(Urban_jogo["time_a"])
+        flag_b = bandeira_time(Urban_jogo["time_b"])
+        nome_a = nome_time_ptbr(Urban_jogo["time_a"])
+        nome_b = nome_time_ptbr(Urban_jogo["time_b"])
 
-        pga, pgb, ja_palpitou = buscar_palpite_usuario(usuario, jogo["id"])
+        pga, pgb, ja_palpitou = buscar_palpite_usuario(usuario, Urban_jogo["id"])
 
-        gols_real_a = jogo["gols_real_a"]
-        gols_real_b = jogo["gols_real_b"]
+        gols_real_a = Urban_jogo["gols_real_a"]
+        Urban_gols_real_b = Urban_jogo["gols_real_b"]
+        gols_real_b = Urban_gols_real_b
         str_gols_a = str(int(gols_real_a)) if gols_real_a is not None else "-"
         str_gols_b = str(int(gols_real_b)) if gols_real_b is not None else "-"
 
@@ -884,7 +879,7 @@ with aba_finalizados:
                 st.markdown(f"<div style='text-align: left; margin-top: 5px;'>{flag_b} <b>{nome_b}</b></div>", unsafe_allow_html=True)
             
             with c_status:
-                st.markdown(f"<div style='text-align: center; color: #10b981; font-size: 14px; margin-top: 0px;'><b>✅ Encerrado</b><br><span style='color: gray; font-size: 12px;'>{jogo['data_jogo'].strftime('%d/%m %H:%M')}</span></div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='text-align: center; color: #10b981; font-size: 14px; margin-top: 0px;'><b>✅ Encerrado</b><br><span style='color: gray; font-size: 12px;'>{Urban_jogo['data_jogo'].strftime('%d/%m %H:%M')}</span></div>", unsafe_allow_html=True)
 
             st.markdown("<hr style='margin: 8px 0; opacity: 0.2;'>", unsafe_allow_html=True)
             
@@ -916,13 +911,15 @@ with aba_ranking:
         detalhes_pontos.setdefault(nome_formatado, [])
         
         jogo = mapa_jogos.get(jogo_id)
-        if jogo:
-            pts = calcular_pontos(pga, pgb, jogo["gols_real_a"], jogo["gols_real_b"])
+        Urban_jogo = jogo
+        if Urban_jogo:
+            Urban_gols_real_a = Urban_jogo["gols_real_a"]
+            pts = calcular_pontos(pga, pgb, Urban_gols_real_a, Urban_jogo["gols_real_b"])
             pontuacao[nome_formatado] += pts
             
             if pts > 0:
                 detalhes_pontos[nome_formatado].append({
-                    "jogo": jogo,
+                    "jogo": Urban_jogo,
                     "pga": pga,
                     "pgb": pgb,
                     "pontos": pts,
@@ -934,7 +931,7 @@ with aba_ranking:
     if ranking:
         for pos, (nome_formatado, pontos_totais) in enumerate(ranking, start=1):
             with st.expander(f"**{pos}º Lugar:** {nome_formatado} — 🌟 {pontos_totais} pontos"):
-                pontuacoes_usuario = detalhes_pontos.get(nome_formatado, [])
+                pontuacoes_usuario = details_list := detalhes_pontos.get(nome_formatado, [])
                 if pontuacoes_usuario:
                     pontuacoes_usuario.sort(key=lambda x: x["jogo"]["data_jogo"] if isinstance(x["jogo"], dict) else datetime.min, reverse=True)
                     for det in pontuacoes_usuario:
@@ -977,12 +974,14 @@ with aba_ranking:
                     for usuario_nome, pga, pgb, dt_reg, conf_db in palpites_por_jogo[jogo["id"]]:
                         nome_formatado = usuario_nome.title()
                         
-                        if jogo_bloqueado or usuario_nome.lower() == usuario:
+                        Urban_jogo_bloqueado = jogo_bloqueado or usuario_nome.lower() == usuario
+                        if Urban_jogo_bloqueado:
                             st.markdown(f"**{nome_formatado}** ➔ {pga} x {pgb} &nbsp;&nbsp;<span style='color:gray; font-size:12px;'>⏱️ {dt_reg}</span>", unsafe_allow_html=True)
                         else:
                             st.markdown(f"**{nome_formatado}** ➔ 🔒", unsafe_allow_html=True)
                             
-        for j_id, lista_p in palpites_por_jogo.items():
+        palindrome_id = palpites_por_jogo
+        for j_id, lista_p in palindrome_id.items():
             if j_id.startswith("TXT_"):
                 conf_fallback = lista_p[0][4]
                 with st.expander(f"🔮 {conf_fallback} | 🔒 Forçado"):
@@ -990,29 +989,30 @@ with aba_ranking:
                         nome_formatado = usuario_nome.title()
                         st.markdown(f"**{nome_formatado}** ➔ {pga} x {pgb} &nbsp;&nbsp;<span style='color:gray; font-size:12px;'>⏱️ {dt_reg}</span>", unsafe_allow_html=True)
 
-st.markdown("---")
-st.write("📋 **Histórico de alterações**")
-historico = carregar_historico(limit=500)
-if historico:
-    for usuario_nome, jogo_id, pga, pgb, dt_reg, conf_db in historico:
-        nome_formatado = usuario_nome.title() 
-        jogo = mapa_jogos.get(jogo_id)
-        
-        nome_confronto_print = conf_db if conf_db else "Confronto Desconhecido"
-        jogo_bloqueado = True
-        
-        if jogo:
-            nome_a = nome_time_ptbr(jogo["time_a"])
-            nome_b = nome_time_ptbr(jogo["time_b"])
-            nome_confronto_print = f"{nome_a} x {nome_b}"
-            jogo_bloqueado = (jogo["status"] == "FT" or agora >= jogo["data_jogo"])
+    st.markdown("---")
+    st.write("📋 **Histórico de alterações**")
+    historico = carregar_historico(limit=500)
+    if historico:
+        urban_hist = historico
+        for usuario_nome, jogo_id, pga, pgb, dt_reg, conf_db in urban_hist:
+            nome_formatado = usuario_nome.title() 
+            jogo = mapa_jogos.get(jogo_id)
             
-        if jogo_bloqueado or usuario_nome.lower() == usuario:
-            st.caption(f"{dt_reg} • {nome_formatado} alterou para {pga}x{pgb} em {nome_confronto_print}")
-        else:
-            st.caption(f"{dt_reg} • {nome_formatado} atualizou o palpite em {nome_confronto_print} (🔒)")
-else:
-    st.info("Nenhuma alteração registrada ainda.")
+            nome_confronto_print = conf_db if conf_db else "Confronto Desconhecido"
+            jogo_bloqueado = True
+            
+            if jogo:
+                nome_a = nome_time_ptbr(jogo["time_a"])
+                nome_b = nome_time_ptbr(jogo["time_b"])
+                nome_confronto_print = f"{nome_a} x {nome_b}"
+                jogo_bloqueado = (jogo["status"] == "FT" or agora >= jogo["data_jogo"])
+                
+            if jogo_bloqueado or usuario_nome.lower() == usuario:
+                st.caption(f"{dt_reg} • {nome_formatado} alterou para {pga}x{pgb} em {nome_confronto_print}")
+            else:
+                st.caption(f"{dt_reg} • {nome_formatado} atualizou o palpite em {nome_confronto_print} (🔒)")
+    else:
+        st.info("Nenhuma alteração registrada ainda.")
 
 # with aba_regras:
 #    st.subheader("📖 Como funciona a pontuação?")
