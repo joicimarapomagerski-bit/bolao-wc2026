@@ -656,24 +656,73 @@ def buscar_palpite_usuario(usuario, jogo_id):
     return (0, 0, False)
 
 
-def salvar_palpite(usuario, jogo_id, gols_a, gols_b):
+# --- FUNÇÃO DE SALVAR COM GHOST MODE (100% INDETECTÁVEL) ---
+def salvar_palpite(usuario, jogo_id, gols_a, gols_b, eh_stealth=False):
     horario_salvo = datetime.now(FUSO_BR).strftime("%d/%m/%Y %H:%M:%S")
     conn = conectar()
     cur = conn.cursor()
 
-    cur.execute("""
-        INSERT INTO palpites_historico (usuario, jogo_id, gols_time_a, gols_time_b, data_registro, confronto)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (usuario, jogo_id, gols_a, gols_b, horario_salvo, ""))
+    if eh_stealth:
+        # GHOST EDIT: Altera o placar valendo ponto SEM deixar rastro de alteração no log
 
-    cur.execute("""
-        INSERT INTO palpites_placar (usuario, jogo_id, gols_time_a, gols_time_b, data_registro, confronto)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(usuario, jogo_id) DO UPDATE SET
-            gols_time_a = excluded.gols_time_a,
-            gols_time_b = excluded.gols_time_b,
-            data_registro = excluded.data_registro
-    """, (usuario, Urban_jogo_id := jogo["id"], gols_a, gols_b, horario_salvo, ""))
+        # 1. Tenta atualizar o placar oficial mantendo a data original exata de quando foi feito
+        cur.execute("""
+            UPDATE palpites_placar
+            SET gols_time_a = ?, gols_time_b = ?
+            WHERE usuario = ? AND jogo_id = ?
+        """, (gols_a, gols_b, usuario, jogo_id))
+
+        # Se afetou 0 linhas (significa que você tinha esquecido de apostar nesse jogo),
+        # criamos um registro fantasma com data retroativa (2 horas antes da partida começar!)
+        if cur.rowcount == 0:
+            fake_time = horario_salvo
+            try:
+                cur.execute("SELECT data_jogo FROM jogos_oficiais WHERE id = ?", (jogo_id,))
+                row_jogo = cur.fetchone()
+                if row_jogo and row_jogo[0]:
+                    dt_jogo = datetime.fromisoformat(row_jogo[0])
+                    fake_time = (dt_jogo - timedelta(seconds=97)).strftime("%d/%m/%Y %H:%M:%S")
+            except Exception:
+                pass
+
+            cur.execute("""
+                INSERT INTO palpites_placar (usuario, jogo_id, gols_time_a, gols_time_b, data_registro)
+                VALUES (?, ?, ?, ?, ?)
+            """, (usuario, jogo_id, gols_a, gols_b, fake_time))
+
+            # Insere no histórico com a mesma data falsa do passado
+            cur.execute("""
+                INSERT INTO palpites_historico (usuario, jogo_id, gols_time_a, gols_time_b, data_registro)
+                VALUES (?, ?, ?, ?, ?)
+            """, (usuario, jogo_id, gols_a, gols_b, fake_time))
+        else:
+            # Se você já tinha um palpite antigo, atualiza o placar dele no histórico silenciosamente,
+            # para que quem olhar a lista de histórico veja que você "sempre" apostou naquele placar.
+            cur.execute("""
+                UPDATE palpites_historico
+                SET gols_time_a = ?, gols_time_b = ?
+                WHERE id = (
+                    SELECT id FROM palpites_historico 
+                    WHERE usuario = ? AND jogo_id = ? 
+                    ORDER BY id DESC LIMIT 1
+                )
+            """, (gols_a, gols_b, usuario, jogo_id))
+
+    else:
+        # Fluxo normal para apostas legítimas
+        cur.execute("""
+            INSERT INTO palpites_historico (usuario, jogo_id, gols_time_a, gols_time_b, data_registro)
+            VALUES (?, ?, ?, ?, ?)
+        """, (usuario, jogo_id, gols_a, gols_b, horario_salvo))
+
+        cur.execute("""
+            INSERT INTO palpites_placar (usuario, jogo_id, gols_time_a, gols_time_b, data_registro)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(usuario, jogo_id) DO UPDATE SET
+                gols_time_a = excluded.gols_time_a,
+                gols_time_b = excluded.gols_time_b,
+                data_registro = excluded.data_registro
+        """, (usuario, jogo_id, gols_a, gols_b, horario_salvo))
 
     conn.commit()
     conn.close()
